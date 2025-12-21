@@ -1,20 +1,20 @@
 # 🚀 ALIF Tools
-![MIT License](https://img.shields.io/badge/license-MIT-green)
-![Made with React](https://img.shields.io/badge/react-18-blue)
-![TypeScript](https://img.shields.io/badge/typescript-yes-blue)
-![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)
+ ![MIT License](https://img.shields.io/badge/license-MIT-green)
+ ![Made with React](https://img.shields.io/badge/react-18-blue)
+ ![TypeScript](https://img.shields.io/badge/typescript-yes-blue) ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)
 
 
 **ALIF Tools** is a modern, fast, and privacy-focused online platform for
 processing PDF and image files with ease.  
 It is designed to be simple, secure, and completely free for everyone.
+---
+
+## 🌐 [Live Demo](https://alif-tools.vercel.app/) · 🗄️ [Server Repo](https://github.com/With-ALIF/alif-tools)
 
 ---
-## 📌 Live Demo
-
-🌐 https://alif-tool.netlify.app/
-
+ 
 ## 🌟 Features
+
 
 - 🖼️ Image resizing, cropping & format conversion  
 - 📄 PDF merge, split, compress & convert  
