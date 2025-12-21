@@ -67,12 +67,12 @@ const Footer: React.FC = () => {
         </h4>
         <ul className="space-y-2 text-sm text-slate-600">
           <li>
-            <a href="https://alif-tool.netlify.app/#/?tab=image" className="hover:text-blue-600 transition">
+            <a href="https://alif-tools.vercel.app/#/?tab=image" className="hover:text-blue-600 transition">
               Image Tools
             </a>
           </li>
           <li>
-            <a href="https://alif-tool.netlify.app/#/?tab=pdf" className="hover:text-blue-600 transition">
+            <a href="https://alif-tools.vercel.app/#/?tab=pdf" className="hover:text-blue-600 transition">
               PDF Tools
             </a>
           </li>
