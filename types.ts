@@ -1,0 +1,34 @@
+export enum ToolCategory {
+  IMAGE = 'IMAGE',
+  PDF = 'PDF'
+}
+
+export enum ToolType {
+  IMG_RESIZE = 'img-resize',
+  IMG_CROP = 'img-crop',
+  IMG_TO_PDF = 'img-to-pdf',
+  IMG_CONVERT = 'img-convert',
+  IMG_DESCRIBE = 'img-describe',
+  PDF_SPLIT = 'pdf-split',
+  PDF_MERGE = 'pdf-merge',
+  PDF_WATERMARK = 'pdf-watermark',
+  PDF_INVERT = 'pdf-invert',
+  PDF_TO_IMG = 'pdf-to-img',
+  WORD_TO_PDF = 'word-to-pdf',
+  PPT_TO_PDF = 'ppt-to-pdf',
+  HTML_TO_PDF = 'html-to-pdf'
+}
+
+export interface ToolDef {
+  id: ToolType;
+  title: string;
+  description: string;
+  category: ToolCategory;
+  icon: string;
+  color: string; // Tailwind text color class
+  bg: string;    // Tailwind background color class
+}
+
+export interface FileWithPreview extends File {
+  preview?: string;
+}

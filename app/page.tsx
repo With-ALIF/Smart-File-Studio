@@ -1,0 +1,1 @@
+// This file is deprecated. Please use App.tsx for the SPA entry point.

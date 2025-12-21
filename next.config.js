@@ -1,0 +1,1 @@
+// File removed. App is now a pure Vite SPA.
