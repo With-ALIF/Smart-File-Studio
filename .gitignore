@@ -1,0 +1,21 @@
+# Dependencies (npm install দিলেই তৈরি হয়)
+node_modules/
+
+# Build output (npm run build দিলেই তৈরি হয়)
+dist/
+
+# Source map ও loose module ফাইল — লাইভ বিল্ডে দরকার নেই
+*.js.map
+*.mjs
+package-lock.json
+
+# Log ফাইল
+*.log
+npm-debug.log*
+
+# OS / Editor ফাইল
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+*.local

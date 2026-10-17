@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://alif-tools.mnr.bd/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+
+  <url><loc>https://alif-tools.mnr.bd/image/img-resize</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://alif-tools.mnr.bd/image/img-crop</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://alif-tools.mnr.bd/image/img-convert</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://alif-tools.mnr.bd/image/img-to-pdf</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://alif-tools.mnr.bd/image/svg-convert</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://alif-tools.mnr.bd/image/img-to-txt</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+
+  <url><loc>https://alif-tools.mnr.bd/pdf/pdf-merge</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://alif-tools.mnr.bd/pdf/pdf-split</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://alif-tools.mnr.bd/pdf/pdf-watermark</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://alif-tools.mnr.bd/pdf/pdf-to-img</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://alif-tools.mnr.bd/pdf/pdf-to-docs</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://alif-tools.mnr.bd/pdf/pdf-to-txt</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://alif-tools.mnr.bd/pdf/pdf-to-md</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+
+  <url><loc>https://alif-tools.mnr.bd/markdown/md-to-pdf</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://alif-tools.mnr.bd/markdown/md-to-docs</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://alif-tools.mnr.bd/markdown/md-to-txt</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+
+  <url><loc>https://alif-tools.mnr.bd/about</loc><changefreq>yearly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://alif-tools.mnr.bd/contact</loc><changefreq>yearly</changefreq><priority>0.5</priority></url>
+</urlset>

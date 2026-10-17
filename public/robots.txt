@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# Search engines welcome
+Disallow: /dist/
+Disallow: /node_modules/
+
+Sitemap: https://alif-tools.mnr.bd/sitemap.xml

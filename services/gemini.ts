@@ -57,3 +57,22 @@ export const describeImage = async (base64Data: string, mimeType: string, userQu
     throw new Error("Failed to analyze image using Gemini.");
   }
 };
+
+export const translateText = async (text: string, target: 'Bengali' | 'English'): Promise<string> => {
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: {
+        parts: [
+          {
+            text: `Translate the following text into ${target}. Preserve the original line breaks and paragraph structure. Return ONLY the translation with no extra comments, notes, or explanations. If the text is already in ${target}, return it unchanged.\n\n---\n${text}`,
+          },
+        ],
+      },
+    });
+    return response.text || text;
+  } catch (error) {
+    console.error("Gemini Translate Error:", error);
+    throw new Error("Failed to translate text.");
+  }
+};

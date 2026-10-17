@@ -17,7 +17,7 @@ It is designed to be simple, secure, and completely free for everyone.
 
 
 - 🖼️ Image resizing, cropping & format conversion  
-- 📄 PDF merge, split, compress & convert  
+- 📄 PDF merge, split & convert  
 - ⚡ Fast and lightweight processing  
 - 🔐 Privacy-first (files are not stored permanently)  
 - 💻 No installation required – works directly in the browser  
@@ -93,45 +93,65 @@ This project is open-source and available under the **MIT License**.
 ⭐ If you like this project, don’t forget to give it a star!
 
 
- Project Structure
- ```
- .
-├── app/
-│   ├── tool/
-│   │   └── [id]/
-│   │       └── page.tsx
-│   ├── layout.tsx
-│   └── page.tsx
-│
+Project Structure
+```
+.
 ├── components/
-│   ├── Tools/
-│   │   ├── ImageTools.tsx
-│   │   ├── OfficeTools.tsx
-│   │   └── PdfTools.tsx
 │   ├── Layout.tsx
 │   ├── SuccessModal.tsx
 │   └── Toast.tsx
 │
 ├── lib/
+│   ├── markdown.ts
+│   ├── svg.ts
 │   ├── tools.tsx
+│   ├── translate.ts
 │   └── utils.ts
 │
 ├── services/
 │   └── gemini.ts
 │
 ├── src/
-│   └── About.tsx
+│   ├── img/
+│   │   ├── imgconverter.tsx
+│   │   ├── imgcropper.tsx
+│   │   ├── imgdescriber.tsx
+│   │   ├── imgresizer.tsx
+│   │   ├── imgtopdf.tsx
+│   │   ├── imgtotxt.tsx
+│   │   └── svgconverter.tsx
+│   ├── markdown/
+│   │   ├── markdowntodocs.tsx
+│   │   ├── markdowntoolbase.tsx
+│   │   ├── markdowntopdf.tsx
+│   │   └── markdowntotxt.tsx
+│   ├── pdf/
+│   │   ├── invertpdf.tsx
+│   │   ├── mergepdf.tsx
+│   │   ├── pdfdocs.tsx
+│   │   ├── pdfimg.tsx
+│   │   ├── pdfjsGlobal.ts
+│   │   ├── pdfmarkdown.tsx
+│   │   ├── pdftext.tsx
+│   │   ├── pdftxt.tsx
+│   │   ├── splitpdf.tsx
+│   │   └── watermarkpdf.tsx
+│   ├── About.tsx
+│   └── Connect.tsx
+│
+├── public/
+│   └── favicon.svg
 │
 ├── .gitignore
 ├── App.tsx
 ├── README.md
+├── index.css
 ├── index.html
 ├── index.tsx
-├── metadata.json
-├── next.config.js
 ├── package.json
 ├── tsconfig.json
 ├── types.ts
+├── vercel.json
 └── vite.config.ts
 
 ```
@@ -143,12 +163,22 @@ This project is open-source and available under the **MIT License**.
 - Split PDF
 - PDF to Image
 - Image to PDF
+- PDF to Docs (.doc)
+- PDF to TXT
+- PDF to Markdown
 
 ### 🖼️ Image Tools
 - Resize Image
 - Crop Image
 - Convert Format
+- SVG Converter (SVG → PNG, JPG, WebP)
 - Image to PDF
+- Image to Text (OCR)
+
+### 📝 Markdown Tools
+- Markdown to Docs (.doc)
+- Markdown to PDF
+- Markdown to TXT
 
 ## ⚙️ How It Works
 ```
@@ -167,7 +197,7 @@ This project is open-source and available under the **MIT License**.
 
 ### Installation
 ```bash
-git clone https://github.com/yourusername/alif-tools.git
+git clone https://github.com/With-ALIF/alif-tools.git
 cd alif-tools
 npm install
 npm run dev
