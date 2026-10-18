@@ -1,21 +1,41 @@
-# Dependencies (npm install দিলেই তৈরি হয়)
+# Dependencies
 node_modules/
 
-# Build output (npm run build দিলেই তৈরি হয়)
+# Next.js build output
+.next/
+out/
+next-env.d.ts
+
+# Vite-era output (no longer used)
 dist/
 
-# Source map ও loose module ফাইল — লাইভ বিল্ডে দরকার নেই
-*.js.map
-*.mjs
-package-lock.json
+# TypeScript incremental build cache
+*.tsbuildinfo
 
-# Log ফাইল
+# Environment files
+ .env
+.env*.local
+.env.example
+
+# Logs
 *.log
 npm-debug.log*
 
-# OS / Editor ফাইল
+# OS / Editor files
 .DS_Store
 Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 *.local
+
+# Lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+bun.lock
+*.lock
+.env
+
+.env.*
+!.env.example

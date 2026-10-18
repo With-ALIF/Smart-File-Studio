@@ -47,6 +47,7 @@ package-lock.json text eol=lf
 *.wav     binary
 
 # Keep diffs quiet for generated / vendored output.
-dist/**    -diff
+.next/**      -diff
+dist/**       -diff
 node_modules/** -diff
-*.log      text eol=lf
+*.log         text eol=lf

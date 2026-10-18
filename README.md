@@ -1,15 +1,14 @@
 # 🚀 ALIF Tools
- ![MIT License](https://img.shields.io/badge/license-MIT-green)
- ![Made with React](https://img.shields.io/badge/react-18-blue)
- ![TypeScript](https://img.shields.io/badge/typescript-yes-blue) ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)
+  ![MIT License](https://img.shields.io/badge/license-MIT-green)
+  ![Next.js](https://img.shields.io/badge/Next.js-16-blue) ![React](https://img.shields.io/badge/react-19-blue)
+  ![TypeScript](https://img.shields.io/badge/typescript-yes-blue) ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)
 
 
 **ALIF Tools** is a modern, fast, and privacy-focused online platform for
 processing PDF and image files with ease.  
 It is designed to be simple, secure, and completely free for everyone.
----
 
-## 🌐 [Live Demo](https://alif-tools.vercel.app/) · 🗄️ [Server Repo](https://github.com/With-ALIF/alif-tools)
+**Live:** [alif-tools.mnr.bd](https://alif-tools.mnr.bd/) · 
 
 ---
  
@@ -53,9 +52,9 @@ improve everyday productivity.
 
 ## 🛠️ Tech Stack
 
-- **Frontend:** React + TypeScript  
-- **Styling:** Tailwind CSS  
-- **Build Tool:** Vite  
+- **Framework:** Next.js 16 (App Router) + React 19 + TypeScript  
+- **Styling:** Tailwind CSS v4  
+- **PDF/Image:** pdf-lib, jsPDF, pdf.js, tesseract.js  
 - **Icons:** Lucide React  
 
 ---
@@ -84,78 +83,96 @@ Feel free to open an issue or submit a pull request.
 
 ---
 
-## 📄 License
-
-This project is open-source and available under the **MIT License**.
-
----
-
 ⭐ If you like this project, don’t forget to give it a star!
 
 
 Project Structure
-```
+```yaml
 .
-├── components/
-│   ├── Layout.tsx
-│   ├── SuccessModal.tsx
-│   └── Toast.tsx
-│
-├── lib/
-│   ├── markdown.ts
-│   ├── svg.ts
-│   ├── tools.tsx
-│   ├── translate.ts
-│   └── utils.ts
-│
-├── services/
-│   └── gemini.ts
+├── public/
+│   ├── apple-touch-icon.png
+│   ├── favicon-32x32.png
+│   ├── favicon.ico
+│   ├── favicon.svg
+│   ├── robots.txt
+│   ├── site.webmanifest
+│   └── sitemap.xml
 │
 ├── src/
-│   ├── img/
-│   │   ├── imgconverter.tsx
-│   │   ├── imgcropper.tsx
-│   │   ├── imgdescriber.tsx
-│   │   ├── imgresizer.tsx
-│   │   ├── imgtopdf.tsx
-│   │   ├── imgtotxt.tsx
-│   │   └── svgconverter.tsx
-│   ├── markdown/
-│   │   ├── markdowntodocs.tsx
-│   │   ├── markdowntoolbase.tsx
-│   │   ├── markdowntopdf.tsx
-│   │   └── markdowntotxt.tsx
-│   ├── pdf/
-│   │   ├── invertpdf.tsx
-│   │   ├── mergepdf.tsx
-│   │   ├── pdfdocs.tsx
-│   │   ├── pdfimg.tsx
-│   │   ├── pdfjsGlobal.ts
-│   │   ├── pdfmarkdown.tsx
-│   │   ├── pdftext.tsx
-│   │   ├── pdftxt.tsx
-│   │   ├── splitpdf.tsx
-│   │   └── watermarkpdf.tsx
-│   ├── About.tsx
-│   └── Connect.tsx
+│   ├── app/
+│   │   ├── [category]/
+│   │   │   └── [id]/
+│   │   │       └── page.tsx
+│   │   ├── about/
+│   │   │   ├── layout.tsx
+│   │   │   └── page.tsx
+│   │   ├── api/
+│   │   │   └── gemini/
+│   │   │       └── route.ts
+│   │   ├── contact/
+│   │   │   ├── layout.tsx
+│   │   │   └── page.tsx
+│   │   ├── layout.tsx
+│   │   ├── not-found.tsx
+│   │   └── page.tsx
+│   │
+│   ├── components/
+│   │   ├── tools/
+│   │   │   ├── img/
+│   │   │   │   ├── imgconverter.tsx
+│   │   │   │   ├── imgcropper.tsx
+│   │   │   │   ├── imgdescriber.tsx
+│   │   │   │   ├── imgresizer.tsx
+│   │   │   │   ├── imgtopdf.tsx
+│   │   │   │   ├── imgtotxt.tsx
+│   │   │   │   └── svgconverter.tsx
+│   │   │   ├── markdown/
+│   │   │   │   ├── markdowntodocs.tsx
+│   │   │   │   ├── markdowntoolbase.tsx
+│   │   │   │   ├── markdowntopdf.tsx
+│   │   │   │   └── markdowntotxt.tsx
+│   │   │   └── pdf/
+│   │   │       ├── invertpdf.tsx
+│   │   │       ├── mergepdf.tsx
+│   │   │       ├── pdfdocs.tsx
+│   │   │       ├── pdfimg.tsx
+│   │   │       ├── pdfmarkdown.tsx
+│   │   │       ├── pdftext.tsx
+│   │   │       ├── pdftxt.tsx
+│   │   │       ├── splitpdf.tsx
+│   │   │       └── watermarkpdf.tsx
+│   │   ├── Layout.tsx
+│   │   ├── SuccessModal.tsx
+│   │   ├── Toast.tsx
+│   │   └── ToolRunner.tsx
+│   │
+│   ├── lib/
+│   │   ├── markdown.ts
+│   │   ├── svg.ts
+│   │   ├── tools.tsx
+│   │   ├── translate.ts
+│   │   └── utils.ts
+│   │
+│   ├── services/
+│   │   └── gemini.ts
+│   │
+│   ├── styles/
+│   │   └── globals.css
+│   │
+│   └── types/
+│       ├── globals.d.ts
+│       └── index.ts
 │
-├── public/
-│   └── favicon.svg
-│
+├── .gitattributes
 ├── .gitignore
-├── App.tsx
 ├── README.md
-├── index.css
-├── index.html
-├── index.tsx
+├── next-env.d.ts
+├── next.config.ts
 ├── package.json
-├── tsconfig.json
-├── types.ts
-├── vercel.json
-└── vite.config.ts
+├── postcss.config.mjs
+└── tsconfig.json
 
 ```
-
 ## 🧰 Available Tools
 
 ### 📄 PDF Tools
@@ -196,9 +213,9 @@ Project Structure
 - npm / yarn / pnpm
 
 ### Installation
-```bash
-git clone https://github.com/With-ALIF/alif-tools.git
-cd alif-tools
+```yaml
+git clone https://github.com/With-ALIF/Smart-File-Studio.git
+cd Smart-File-Studio
 npm install
 npm run dev
 ```
