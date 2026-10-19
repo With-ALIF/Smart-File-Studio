@@ -8,6 +8,8 @@ export const MdToTxt: React.FC = () => (
     <MarkdownTool
         fileHint="Upload Markdown to convert to TXT"
         buttonLabel="Download TXT"
+        outputLabel="Plain text"
+        getOutputText={markdownToPlainText}
         onConvert={(text, name) => {
             const out = markdownToPlainText(text);
             downloadFile(new Blob([out], { type: 'text/plain;charset=utf-8' }), `${name}.txt`);

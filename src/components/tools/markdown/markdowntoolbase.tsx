@@ -1,7 +1,7 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { jsPDF } from 'jspdf';
-import { Download, FileText, FileCode } from 'lucide-react';
+import { Check, Copy, Download, FileCode, FileText, Sparkles, Upload, X } from 'lucide-react';
 import { useToast } from '../../../components/Toast';
 import type { MdBlock } from '../../../lib/markdown';
 import { NOTO_BENGALI_TTF } from '../../../lib/fonts/notoBengali';
@@ -89,6 +89,24 @@ const sanitizeText = (input: string): string => {
         if (isLatinSafe(code)) out += ch;
     }
     return out.replace(/[ \t]{2,}/g, ' ').trim();
+};
+
+const sanitizeCodeLine = (input: string): string => {
+    let out = '';
+    for (const ch of input) {
+        const code = ch.codePointAt(0) ?? 0;
+        const mapped = CHAR_REPLACEMENTS[ch];
+        if (mapped !== undefined) {
+            out += mapped;
+            continue;
+        }
+        if (bengaliActive && isBengaliChar(code)) {
+            out += ch;
+            continue;
+        }
+        if (isLatinSafe(code)) out += ch;
+    }
+    return out;
 };
 
 type FontKey = 'normal' | 'bold' | 'italic' | 'bolditalic' | 'code' | 'codebold';
@@ -336,33 +354,125 @@ case 'heading': {
                 break;
             }
 
+            case 'table': {
+                const size = 9.5;
+                const lineHeight = 13;
+                const pad = 5;
+                const columns = block.header.length;
+                const colW = contentW / columns;
+
+                const rowCells = (cells: string[], header: boolean) =>
+                    cells.map((cell) =>
+                        layout(parseInline(cell, header ? 'bold' : 'normal'), size, colW - pad * 2)
+                    );
+
+                const drawRow = (cells: string[], header: boolean) => {
+                    const cellLines = rowCells(cells, header);
+                    const maxLines = Math.max(...cellLines.map((lines) => lines.length));
+                    const rowH = maxLines * lineHeight + pad * 2;
+                    if (y + rowH > pageH - margin) newPage();
+
+                    if (header) {
+                        doc.setFillColor(243, 244, 246);
+                        doc.rect(margin, y, contentW, rowH, 'F');
+                    }
+
+                    doc.setDrawColor(203, 213, 225);
+                    doc.setLineWidth(0.5);
+                    cellLines.forEach((lines, index) => {
+                        const x = margin + index * colW;
+                        doc.rect(x, y, colW, rowH);
+                        let cellY = y + pad + size * 0.8;
+                        lines.forEach((words) => {
+                            let cursor = x + pad;
+                            words.forEach((word, wordIndex) => {
+                                applyFont(word.run, size);
+                                doc.text(word.text, cursor, cellY);
+                                cursor += word.width;
+                                if (wordIndex < words.length - 1) cursor += doc.getTextWidth(' ');
+                            });
+                            cellY += lineHeight;
+                        });
+                    });
+                    y += rowH;
+                };
+
+                drawRow(block.header, true);
+                block.rows.forEach((row) =>
+                    drawRow(Array.from({ length: columns }, (_, index) => row[index] ?? ''), false)
+                );
+                y += 8;
+                break;
+            }
+
             case 'code': {
                 const size = 9.5;
                 const lineHeight = 13;
-const rawLines = block.text.split('\n').map((l) => sanitizeText(l)).filter((l, i, arr) => l !== '' || i < arr.length - 1);
                 const boxPad = 10;
-                const boxHeight = rawLines.length * lineHeight + boxPad * 2;
+                const maxTextWidth = contentW - boxPad * 2 - 2;
+                const rawLines = block.text
+                    .split('\n')
+                    .map((line) => sanitizeCodeLine(line.replace(/\t/g, '    ')));
 
-                if (y + boxHeight > pageH - margin) newPage();
-
-                doc.setFillColor(246, 247, 249);
-                doc.rect(margin, y - size, contentW, boxHeight, 'F');
-                doc.setDrawColor(0, 102, 204);
-                doc.setLineWidth(2);
-                doc.line(margin, y - size, margin, y - size + boxHeight);
-
-                // Courier has no Bengali glyphs, so fall back to Noto there.
-                const codeFont = bengaliEnabled ? BENGALI_FONT_NAME : 'courier';
-                let codeY = y + boxPad;
-                rawLines.forEach((line) => {
-                    doc.setFont(codeFont, 'normal');
+                const wrapLine = (line: string, lineHasBengali: boolean): string[] => {
+                    doc.setFont(lineHasBengali && bengaliEnabled ? BENGALI_FONT_NAME : 'courier', 'normal');
                     doc.setFontSize(size);
-                    doc.setTextColor(...BASE_COLOR);
-                    doc.text(line || ' ', margin + boxPad + 2, codeY);
-                    codeY += lineHeight;
-                });
+                    if (!line) return [''];
+                    const lines: string[] = [];
+                    let current = '';
+                    for (const ch of line) {
+                        const next = current + ch;
+                        if (current && doc.getTextWidth(next) > maxTextWidth) {
+                            lines.push(current);
+                            current = ch;
+                        } else {
+                            current = next;
+                        }
+                    }
+                    lines.push(current);
+                    return lines;
+                };
 
-                y += boxHeight + 10;
+                const wrapped: { text: string; bengali: boolean }[] = [];
+                for (const line of rawLines) {
+                    const bengali = bengaliEnabled && hasBengali(line);
+                    for (const part of wrapLine(line, bengali)) {
+                        wrapped.push({ text: part, bengali });
+                    }
+                }
+
+                let index = 0;
+                while (index < wrapped.length) {
+                    const available = pageH - margin - y;
+                    const maxLines = Math.floor((available - boxPad * 2) / lineHeight);
+                    if (maxLines <= 0) {
+                        newPage();
+                        continue;
+                    }
+
+                    const count = Math.min(wrapped.length - index, maxLines);
+                    const chunk = wrapped.slice(index, index + count);
+                    const boxHeight = chunk.length * lineHeight + boxPad * 2;
+
+                    doc.setFillColor(246, 247, 249);
+                    doc.rect(margin, y - size, contentW, boxHeight, 'F');
+                    doc.setDrawColor(0, 102, 204);
+                    doc.setLineWidth(2);
+                    doc.line(margin, y - size, margin, y - size + boxHeight);
+
+                    let codeY = y + boxPad;
+                    for (const item of chunk) {
+                        doc.setFont(item.bengali ? BENGALI_FONT_NAME : 'courier', 'normal');
+                        doc.setFontSize(size);
+                        doc.setTextColor(...BASE_COLOR);
+                        doc.text(item.text || ' ', margin + boxPad + 2, codeY);
+                        codeY += lineHeight;
+                    }
+
+                    index += count;
+                    y += boxHeight + 10;
+                    if (index < wrapped.length) newPage();
+                }
                 break;
             }
 
@@ -387,27 +497,91 @@ interface MarkdownToolProps {
     fileHint: string;
     buttonLabel: string;
     onConvert: (text: string, baseName: string) => void | Promise<void>;
+    outputLabel?: string;
+    getOutputText?: (text: string) => string;
+    getOutputHtml?: (text: string) => string;
+    renderPreview?: (markdown: string) => React.ReactNode;
 }
 
-export const MarkdownTool: React.FC<MarkdownToolProps> = ({ fileHint, buttonLabel, onConvert }) => {
-    const { showToast } = useToast();
-    const [file, setFile] = useState<File | null>(null);
-    const [processing, setProcessing] = useState(false);
+interface MarkdownResult {
+    text: string;
+    source: string;
+    name: string;
+}
 
-    const onFileLoad = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const f = e.target.files?.[0];
-        if (!f) return;
-        setFile(f);
+export const MarkdownTool: React.FC<MarkdownToolProps> = ({
+    fileHint,
+    buttonLabel,
+    onConvert,
+    outputLabel = 'Converted text',
+    getOutputText,
+    getOutputHtml,
+    renderPreview,
+}) => {
+    const { showToast } = useToast();
+    const inputId = useId();
+    const [file, setFile] = useState<File | null>(null);
+    const [text, setText] = useState('');
+    const [output, setOutput] = useState<MarkdownResult | null>(null);
+    const [processing, setProcessing] = useState(false);
+    const [copied, setCopied] = useState(false);
+
+    const hasOutput = Boolean(getOutputText);
+    const canConvert = text.trim().length > 0;
+    const baseName = (file?.name || 'document').replace(/\.(md|markdown|txt)$/i, '') || 'document';
+
+    const clearResult = () => {
+        setOutput(null);
+        setCopied(false);
     };
 
-    const run = async () => {
-        if (!file) return;
+    const updateText = (value: string) => {
+        setText(value);
+        clearResult();
+    };
+
+    const onFileLoad = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const f = e.target.files?.[0];
+        e.target.value = '';
+        if (!f) return;
+        try {
+            const content = await f.text();
+            setFile(f);
+            setText(content);
+            clearResult();
+            showToast(`Loaded ${f.name}`);
+        } catch {
+            showToast('Could not read this file', 'error');
+        }
+    };
+
+    const removeFile = () => {
+        setFile(null);
+    };
+
+    const clearAll = () => {
+        setFile(null);
+        setText('');
+        clearResult();
+    };
+
+    const convert = async () => {
+        const source = text.trim();
+        if (!source) {
+            showToast('Paste some Markdown or upload a file first.', 'error');
+            return;
+        }
         setProcessing(true);
         try {
-            const text = await file.text();
-            const baseName = file.name.replace(/\.(md|markdown|txt)$/i, '') || 'document';
-            await onConvert(text, baseName);
-            showToast('Done');
+            if (!getOutputText) {
+                await onConvert(source, baseName);
+                showToast('Done');
+                return;
+            }
+            const result = getOutputText(source);
+            setOutput({ text: result, source, name: baseName });
+            setCopied(false);
+            showToast('Converted — copy or download below');
         } catch (err) {
             console.error(err);
             showToast('Conversion failed', 'error');
@@ -416,39 +590,183 @@ export const MarkdownTool: React.FC<MarkdownToolProps> = ({ fileHint, buttonLabe
         }
     };
 
+    const download = async () => {
+        if (!output) return;
+        setProcessing(true);
+        try {
+            await onConvert(output.source, output.name);
+            showToast('Downloaded');
+        } catch (err) {
+            console.error(err);
+            showToast('Download failed', 'error');
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const copy = async () => {
+        if (!output) return;
+        let copied = false;
+
+        try {
+            const html = getOutputHtml?.(output.source);
+            if (html && typeof ClipboardItem !== 'undefined' && navigator.clipboard.write) {
+                const documentHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${html}</body></html>`;
+                await navigator.clipboard.write([
+                    new ClipboardItem({
+                        'text/html': new Blob([documentHtml], { type: 'text/html' }),
+                        'text/plain': new Blob([output.text], { type: 'text/plain' }),
+                    }),
+                ]);
+                copied = true;
+            } else {
+                await navigator.clipboard.writeText(output.text);
+                copied = true;
+            }
+        } catch {
+            try {
+                await navigator.clipboard.writeText(output.text);
+                copied = true;
+            } catch {
+                copied = false;
+            }
+        }
+
+        if (copied) {
+            setCopied(true);
+            showToast('Copied to clipboard');
+            window.setTimeout(() => setCopied(false), 2000);
+        } else {
+            showToast('Copy failed', 'error');
+        }
+    };
+
     return (
-        <div className="space-y-4 md:space-y-6">
-            {!file ? (
-                <div className="border-2 border-dashed border-slate-300 rounded-2xl p-6 md:p-12 text-center hover:border-blue-500 hover:bg-blue-50/30 transition-all bg-white">
-                    <input type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" onChange={onFileLoad} className="hidden" id="md-upload" />
-                    <label htmlFor="md-upload" className="cursor-pointer flex flex-col items-center group">
-                        <div className="w-12 h-12 md:w-16 md:h-16 bg-blue-50 rounded-2xl flex items-center justify-center mb-3 md:mb-4 group-hover:scale-110 transition-transform shadow-sm">
-                            <FileCode className="w-6 h-6 md:w-8 md:h-8 text-blue-600" />
-                        </div>
-                        <h3 className="text-base md:text-lg font-bold text-slate-800 mb-1">{fileHint}</h3>
-                        <p className="text-slate-500 text-xs md:text-sm">Click to choose a Markdown file</p>
-                    </label>
+        <div className={`grid items-start gap-4 md:gap-6 ${hasOutput ? 'lg:grid-cols-2' : ''}`}>
+            <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="flex items-center gap-2 text-sm font-bold text-slate-800 md:text-base">
+                        <FileCode className="h-4 w-4 text-blue-600" />
+                        Markdown input
+                    </h3>
+                    {file && (
+                        <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
+                            <FileText className="h-3 w-3 shrink-0" />
+                            <span className="max-w-[160px] truncate">{file.name}</span>
+                            <button
+                                type="button"
+                                onClick={removeFile}
+                                aria-label="Remove uploaded file"
+                                className="rounded-full p-0.5 hover:bg-blue-100"
+                            >
+                                <X className="h-3 w-3" />
+                            </button>
+                        </span>
+                    )}
                 </div>
-            ) : (
-                <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                    <div className="text-center">
-                        <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center mx-auto mb-2 text-blue-600 border border-blue-100">
-                            <FileText className="w-6 h-6" />
-                        </div>
-                        <h3 className="text-base md:text-lg font-bold text-slate-800 break-all px-2">{file.name}</h3>
+
+                <div className="grid gap-3 sm:grid-cols-[1fr_150px]">
+                    <div className="relative">
+                        <textarea
+                            value={text}
+                            onChange={(e) => updateText(e.target.value)}
+                            placeholder="Paste your Markdown here..."
+                            aria-label="Markdown text"
+                            className="h-56 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 md:text-base"
+                        />
+                        <span className="pointer-events-none absolute bottom-2.5 right-3 text-[11px] text-slate-400">
+                            {text.length.toLocaleString()} chars
+                        </span>
                     </div>
 
-                    <button
-                        onClick={run}
-                        disabled={processing}
-                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-3.5 md:py-4 rounded-xl font-bold flex justify-center items-center gap-2 shadow-lg shadow-blue-200 transition-all text-sm md:text-base"
+                    <input
+                        id={inputId}
+                        type="file"
+                        accept=".md,.markdown,.txt,text/markdown,text/plain"
+                        onChange={onFileLoad}
+                        className="hidden"
+                    />
+                    <label
+                        htmlFor={inputId}
+                        className={`flex h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-3 text-center transition-all sm:h-56 ${
+                            file
+                                ? 'border-blue-400 bg-blue-50/50'
+                                : 'border-slate-300 bg-slate-50/60 hover:border-blue-500 hover:bg-blue-50/40'
+                        }`}
                     >
-                        {processing ? 'Converting...' : (<><Download className="w-5 h-5" /><span>{buttonLabel}</span></>)}
+                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 shadow-sm">
+                            <Upload className="h-5 w-5" />
+                        </span>
+                        <span className="text-sm font-bold text-slate-800">{file ? 'Change file' : 'Upload file'}</span>
+                        <span className="max-w-full truncate text-[11px] text-slate-500">{file?.name ?? '.md, .markdown, .txt'}</span>
+                    </label>
+                </div>
+
+                <p className="text-[11px] leading-relaxed text-slate-400">
+                    {fileHint}. Uploads fill the text box so you can edit before converting.
+                </p>
+
+                <button
+                    onClick={convert}
+                    disabled={processing || !canConvert}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-200 transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 md:py-4 md:text-base"
+                >
+                    {processing ? (
+                        'Converting...'
+                    ) : hasOutput ? (
+                        <><Sparkles className="h-5 w-5" /><span>Convert</span></>
+                    ) : (
+                        <><Download className="h-5 w-5" /><span>{buttonLabel}</span></>
+                    )}
+                </button>
+
+                {(text || file) && (
+                    <button onClick={clearAll} className="w-full text-sm text-slate-500 underline hover:text-slate-700">
+                        Clear
+                    </button>
+                )}
+            </div>
+
+            {hasOutput && (
+                <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+                    <div className="flex items-center justify-between gap-3">
+                        <h3 className="text-sm font-bold text-slate-800 md:text-base">{outputLabel}</h3>
+                        <button
+                            onClick={copy}
+                            disabled={!output}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                            {copied ? 'Copied' : 'Copy'}
+                        </button>
+                    </div>
+
+                    {renderPreview && output ? (
+                        <div className="md-preview h-56 overflow-auto rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-900 md:text-base">
+                            {renderPreview(output.source)}
+                        </div>
+                    ) : (
+                        <textarea
+                            readOnly
+                            value={output?.text ?? ''}
+                            placeholder="Converted text will appear here."
+                            aria-label={outputLabel}
+                            className="h-56 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 md:text-base"
+                        />
+                    )}
+
+                    <button
+                        onClick={download}
+                        disabled={!output || processing}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-lg shadow-blue-200 transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 md:py-3.5 md:text-base"
+                    >
+                        <Download className="h-5 w-5" />
+                        {buttonLabel}
                     </button>
 
-                    <button onClick={() => setFile(null)} className="w-full text-slate-500 text-sm hover:text-slate-700 underline">
-                        Choose another file
-                    </button>
+                    <p className="text-[11px] leading-relaxed text-slate-400">
+                        Everything runs locally in your browser. Nothing is uploaded.
+                    </p>
                 </div>
             )}
         </div>

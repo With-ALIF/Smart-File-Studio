@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import Script from 'next/script';
 import '../styles/globals.css';
 import { ToastProvider } from '../components/Toast';
 
@@ -147,24 +148,38 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <link
                     rel="stylesheet"
                     href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
-                    integrity="sha384-n8MVd4RsNIU0tAv4ct0tNaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV"
+                    integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV"
                     crossOrigin="anonymous"
                 />
-                <script
+                <Script
                     src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"
                     integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8"
                     crossOrigin="anonymous"
+                    strategy="beforeInteractive"
                 />
-                <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js" />
-                <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" />
-                <script src="https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js" />
-                <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" />
-                <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" />
-                <script
-                    dangerouslySetInnerHTML={{
-                        __html: `window.pdfjsLib && (window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js');`,
-                    }}
+                <Script
+                    src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"
+                    strategy="beforeInteractive"
                 />
+                <Script
+                    src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"
+                    strategy="beforeInteractive"
+                />
+                <Script
+                    src="https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js"
+                    strategy="beforeInteractive"
+                />
+                <Script
+                    src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
+                    strategy="beforeInteractive"
+                />
+                <Script
+                    src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"
+                    strategy="beforeInteractive"
+                />
+                <Script id="pdfjs-worker" strategy="beforeInteractive">
+                    {`window.pdfjsLib && (window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js');`}
+                </Script>
                 <script
                     type="application/ld+json"
                     dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

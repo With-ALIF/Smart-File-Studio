@@ -23,16 +23,6 @@ const nextConfig: NextConfig = {
                 headers: securityHeaders,
             },
             {
-                // Hashed build assets are safe to cache for a long time.
-                source: '/_next/static/:path*',
-                headers: [
-                    {
-                        key: 'Cache-Control',
-                        value: 'public, max-age=31536000, immutable',
-                    },
-                ],
-            },
-            {
                 source: '/favicon.svg',
                 headers: [{ key: 'Cache-Control', value: 'public, max-age=604800' }],
             },

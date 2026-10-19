@@ -1,9 +1,12 @@
+export type MdTableAlign = 'left' | 'center' | 'right';
+
 export type MdBlock =
     | { type: 'heading'; level: number; text: string }
     | { type: 'paragraph'; text: string }
     | { type: 'list'; ordered: boolean; items: string[] }
     | { type: 'code'; text: string }
     | { type: 'quote'; text: string }
+    | { type: 'table'; header: string[]; rows: string[][]; align: MdTableAlign[] }
     | { type: 'hr' };
 
 const escapeHtml = (s: string): string =>
@@ -27,6 +30,55 @@ const inlineHtml = (s: string): string => {
 
 const FENCE_RE = /^ {0,3}(`{3,}|~{3,})\s*(\S*)\s*$/;
 const FENCE_CLOSE_RE = /^ {0,3}(`{3,}|~{3,})\s*$/;
+
+const splitTableRow = (line: string): string[] => {
+    let row = line.trim();
+    if (row.startsWith('|')) row = row.slice(1);
+    if (row.endsWith('|') && !row.endsWith('\\|')) row = row.slice(0, -1);
+    const cells: string[] = [];
+    let cell = '';
+    for (let i = 0; i < row.length; i++) {
+        if (row[i] === '\\' && row[i + 1] === '|') {
+            cell += '|';
+            i++;
+            continue;
+        }
+        if (row[i] === '|') {
+            cells.push(cell.trim());
+            cell = '';
+            continue;
+        }
+        cell += row[i];
+    }
+    cells.push(cell.trim());
+    return cells;
+};
+
+const parseTableAlign = (line: string): MdTableAlign[] | null => {
+    if (!line.includes('|')) return null;
+    const cells = splitTableRow(line);
+    if (!cells.length) return null;
+    const align: MdTableAlign[] = [];
+    for (const cell of cells) {
+        if (!/^:?-{3,}:?$/.test(cell)) return null;
+        const left = cell.startsWith(':');
+        const right = cell.endsWith(':');
+        align.push(left && right ? 'center' : right ? 'right' : 'left');
+    }
+    return align;
+};
+
+const isTableStart = (lines: string[], index: number): boolean => {
+    const header = lines[index];
+    const delimiter = lines[index + 1];
+    return Boolean(header && delimiter && header.includes('|') && parseTableAlign(delimiter));
+};
+
+const normalizeCells = (cells: string[], length: number): string[] =>
+    Array.from({ length }, (_, index) => cells[index] ?? '');
+
+const normalizeAlign = (align: MdTableAlign[], length: number): MdTableAlign[] =>
+    Array.from({ length }, (_, index) => align[index] ?? 'left');
 
 export const markdownToBlocks = (md: string): MdBlock[] => {
     const lines = md.replace(/\r\n?/g, '\n').split('\n');
@@ -54,6 +106,21 @@ export const markdownToBlocks = (md: string): MdBlock[] => {
                 i++;
             }
             blocks.push({ type: 'code', text: code.join('\n') });
+            continue;
+        }
+
+        if (isTableStart(lines, i)) {
+            const header = splitTableRow(line);
+            const align = normalizeAlign(parseTableAlign(lines[i + 1]) ?? [], header.length);
+            const rows: string[][] = [];
+            i += 2;
+            while (i < lines.length) {
+                const rowLine = lines[i];
+                if (!rowLine.trim() || !rowLine.includes('|')) break;
+                rows.push(normalizeCells(splitTableRow(rowLine), header.length));
+                i++;
+            }
+            blocks.push({ type: 'table', header, rows, align });
             continue;
         }
 
@@ -121,7 +188,8 @@ export const markdownToBlocks = (md: string): MdBlock[] => {
             !/^\s*[-*+]\s+/.test(lines[i]) &&
             !/^\s*\d+[.)]\s+/.test(lines[i]) &&
             !/^\s*>\s?/.test(lines[i]) &&
-            !/^\s*([-*_])\1{2,}\s*$/.test(lines[i])
+            !/^\s*([-*_])\1{2,}\s*$/.test(lines[i]) &&
+            !isTableStart(lines, i)
         ) {
             para.push(lines[i]);
             i++;
@@ -157,27 +225,82 @@ export const markdownToHtml = (md: string): string => {
                 parts.push(`<${tag}>${items}</${tag}>`);
                 break;
             }
+            case 'table': {
+                const head = block.header
+                    .map(
+                        (cell, index) =>
+                            `<th style="border:1px solid #cbd5e1;padding:6px 8px;background:#f1f5f9;font-weight:700;text-align:${block.align[index]};vertical-align:top">${inlineHtml(cell)}</th>`
+                    )
+                    .join('');
+                const body = block.rows
+                    .map((row) => {
+                        const cells = row
+                            .map(
+                                (cell, index) =>
+                                    `<td style="border:1px solid #cbd5e1;padding:6px 8px;text-align:${block.align[index]};vertical-align:top">${inlineHtml(cell)}</td>`
+                            )
+                            .join('');
+                        return `<tr>${cells}</tr>`;
+                    })
+                    .join('');
+                parts.push(
+                    `<table style="border-collapse:collapse;margin:0 0 10px 0;width:100%"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`
+                );
+                break;
+            }
         }
     }
     return parts.join('\n');
 };
 
-export const markdownToPlainText = (md: string): string => {
-    return md
-        .replace(/\r\n?/g, '\n')
-        .replace(/```[^\n]*\n?/g, '')
-        .replace(/`([^`]+)`/g, '$1')
+const stripInlineMarkdown = (value: string): string =>
+    value
         .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
         .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
-        .replace(/^#{1,6}\s+/gm, '')
-        .replace(/^\s*>\s?/gm, '')
-        .replace(/^\s*[-*+]\s+/gm, '• ')
-        .replace(/^\s*\d+[.)]\s+/gm, '')
+        .replace(/`([^`]+)`/g, '$1')
+        .replace(/\*\*\*([^*]+)\*\*\*/g, '$1')
         .replace(/\*\*([^*]+)\*\*/g, '$1')
         .replace(/__([^_]+)__/g, '$1')
-        .replace(/\*([^*]+)\*/g, '$1')
-        .replace(/(^|[^_])_([^_]+)_/g, '$1$2')
-        .replace(/^\s*([-*_])\1{2,}\s*$/gm, '')
+        .replace(/~~([^~]+)~~/g, '$1')
+        .replace(/(^|[^*])\*([^*]+)\*/g, '$1$2')
+        .replace(/(^|[^_])_([^_]+)_/g, '$1$2');
+
+const tableToPlainText = (block: Extract<MdBlock, { type: 'table' }>): string => {
+    const rows = [block.header, ...block.rows];
+    return rows
+        .map((row) =>
+            row
+                .map((cell) => stripInlineMarkdown(cell).replace(/\s+/g, ' ').trim())
+                .join('\t')
+        )
+        .join('\n');
+};
+
+export const markdownToPlainText = (md: string): string => {
+    return markdownToBlocks(md)
+        .map((block) => {
+            switch (block.type) {
+                case 'heading':
+                case 'paragraph':
+                case 'quote':
+                    return stripInlineMarkdown(block.text);
+                case 'code':
+                    return block.text;
+                case 'list':
+                    return block.items
+                        .map(
+                            (item, index) =>
+                                `${block.ordered ? `${index + 1}.` : '\u2022'} ${stripInlineMarkdown(item)}`
+                        )
+                        .join('\n');
+                case 'table':
+                    return tableToPlainText(block);
+                case 'hr':
+                    return '';
+            }
+        })
+        .filter((part) => part.trim().length > 0)
+        .join('\n\n')
         .replace(/\n{3,}/g, '\n\n')
         .trim();
 };

@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="thumbTitle thumbDesc">
+  <title id="thumbTitle">ALIF Tools — Smart File Studio</title>
+  <desc id="thumbDesc">Minimal thumbnail for ALIF Tools, a free online toolkit for PDF, image and Markdown files.</desc>
+
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.55" stop-color="#F5FAFF"/>
+      <stop offset="1" stop-color="#EAF4FF"/>
+    </linearGradient>
+
+    <radialGradient id="bgGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#3B82F6" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#3B82F6" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#111827"/>
+      <stop offset="0.55" stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#172554"/>
+    </linearGradient>
+
+    <radialGradient id="panelGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#3B82F6" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#3B82F6" stop-opacity="0"/>
+    </radialGradient>
+
+    <pattern id="dotGrid" width="28" height="28" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.4" fill="#2C4B9B" opacity="0.08"/>
+    </pattern>
+
+    <filter id="panelShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="24" stdDeviation="32" flood-color="#0F172A" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#dotGrid)"/>
+  <circle cx="980" cy="290" r="360" fill="url(#bgGlow)"/>
+
+  <circle cx="950" cy="315" r="238" fill="none" stroke="#BFDBFE" stroke-opacity="0.55" stroke-width="1.5"/>
+  <circle cx="950" cy="315" r="294" fill="none" stroke="#BFDBFE" stroke-opacity="0.30" stroke-width="1.5"/>
+
+  <g font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <g transform="translate(80 64)">
+      <rect width="48" height="48" rx="12" fill="#111827"/>
+      <g transform="scale(0.75)">
+        <path d="M25 25 V18 a7 7 0 0 1 14 0 V25" fill="none" stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round"/>
+        <rect x="13" y="25" width="38" height="25" rx="4" fill="#FFFFFF"/>
+        <rect x="13" y="31.5" width="38" height="2" fill="#111827"/>
+        <rect x="28.5" y="30.6" width="7" height="3.8" rx="1.6" fill="#111827"/>
+        <path d="M49 10.5 L51 15 L55.5 17 L51 19 L49 23.5 L47 19 L42.5 17 L47 15 Z" fill="#3B82F6"/>
+      </g>
+    </g>
+
+    <text x="144" y="88" font-size="20" font-weight="700" letter-spacing="2.4" fill="#0F172A">ALIF TOOLS</text>
+    <text x="144" y="110" font-size="11" font-weight="600" letter-spacing="3" fill="#64748B">SMART FILE STUDIO</text>
+
+    <text x="80" y="202" font-size="14" font-weight="700" letter-spacing="3.5" fill="#3B82F6">FREE ONLINE FILE TOOLS</text>
+
+    <text x="78" y="276" font-size="62" font-weight="700" letter-spacing="-1.6" fill="#0F172A">Every file tool.</text>
+    <text x="78" y="342" font-size="62" font-weight="700" letter-spacing="-1.6" fill="#2C4B9B">One workspace.</text>
+
+    <text x="80" y="400" font-size="21" fill="#475569">Resize, crop, convert, merge and split</text>
+    <text x="80" y="430" font-size="21" fill="#475569">images, PDFs and Markdown. Fast, private, free.</text>
+
+    <g font-size="13.5" font-weight="700" letter-spacing="0.8" fill="#2C4B9B">
+      <rect x="80" y="478" width="76" height="40" rx="20" fill="#E0F2FE"/>
+      <text x="118" y="503" text-anchor="middle">PDF</text>
+      <rect x="168" y="478" width="92" height="40" rx="20" fill="#E0F2FE"/>
+      <text x="214" y="503" text-anchor="middle">IMAGE</text>
+      <rect x="272" y="478" width="128" height="40" rx="20" fill="#E0F2FE"/>
+      <text x="336" y="503" text-anchor="middle">MARKDOWN</text>
+    </g>
+
+    <circle cx="87" cy="567" r="5" fill="#3B82F6"/>
+    <text x="102" y="573" font-size="15" font-weight="500" fill="#64748B">alif-tools.mnr.bd</text>
+  </g>
+
+  <rect x="780" y="145" width="340" height="340" rx="64" fill="url(#panel)" filter="url(#panelShadow)"/>
+  <circle cx="950" cy="315" r="156" fill="url(#panelGlow)"/>
+  <rect x="780.75" y="145.75" width="338.5" height="338.5" rx="63.25" fill="none" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="1.5"/>
+
+  <g transform="translate(950 315) scale(4) translate(-34.25 -30.25)">
+    <path d="M25 25 V18 a7 7 0 0 1 14 0 V25" fill="none" stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round"/>
+    <rect x="13" y="25" width="38" height="25" rx="4" fill="#FFFFFF"/>
+    <rect x="13" y="31.5" width="38" height="2" fill="#0F172A"/>
+    <rect x="28.5" y="30.6" width="7" height="3.8" rx="1.6" fill="#0F172A"/>
+    <path d="M49 10.5 L51 15 L55.5 17 L51 19 L49 23.5 L47 19 L42.5 17 L47 15 Z" fill="#3B82F6"/>
+  </g>
+
+  <circle cx="1122" cy="140" r="33" fill="#3B82F6" stroke="#FFFFFF" stroke-width="6"/>
+  <path d="M1122 124 L1126 136 L1138 140 L1126 144 L1122 156 L1118 144 L1106 140 L1118 136 Z" fill="#FFFFFF"/>
+</svg>
