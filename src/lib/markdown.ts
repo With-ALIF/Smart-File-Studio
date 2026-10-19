@@ -256,6 +256,7 @@ pre{
   white-space:pre-wrap;
   word-wrap:break-word;
 }
+pre div{ margin:0; padding:0; line-height:1.45; }
 
 code{
   font-family:"Consolas","Courier New",monospace;
@@ -286,21 +287,266 @@ ${bodyHtml}
     return new Blob(['\ufeff', html], { type: 'application/msword' });
 };
 
-export const textToMarkdown = (text: string): string => {
-    return text
+/* ------------------------------------------------------------------ *
+ * Extracted-PDF text -> structured output
+ *
+ * PDF text extraction gives us raw lines with no semantics. Running those
+ * through a naive "one paragraph per block" split destroys indentation,
+ * collapses code listings into a single blob of text and prints markdown
+ * markers verbatim. These helpers classify each line so code stays code.
+ * ------------------------------------------------------------------ */
+
+type ExtractedBlock =
+    | { kind: 'code'; lines: string[] }
+    | { kind: 'heading'; level: number; text: string }
+    | { kind: 'list'; ordered: boolean; items: string[] }
+    | { kind: 'quote'; lines: string[] }
+    | { kind: 'hr' }
+    | { kind: 'paragraph'; lines: string[] };
+
+/**
+ * Many PDFs embed a font without a Unicode map, so box-drawing glyphs come
+ * back as their raw glyph ids - e.g. "│" (U+2502) turns into the two
+ * characters "%ß". Without a repair pass those lines are indistinguishable
+ * from prose and the whole listing collapses into one paragraph.
+ *
+ * These replacements map the most common id sequences back onto the real
+ * characters so indentation and structure survive.
+ */
+const GLYPH_REPAIRS: [RegExp, string][] = [
+    // ---- Latin-1 double-decode (the common case):
+    // each box-drawing glyph comes back as a fixed multi-byte string.
+    // Order matters: longer variants first, and the "│" rule must run last.
+    [/%\xDF%\xDF%\xDF\xDF/g, '\u2514'], // └──   (6 chars)
+    [/%\xDF%\xDF\xDF/g, '\u251C'],     // ├──   (5 chars, trailing ß)
+    [/%\xDF%\xDF%/g, '\u2502'],        // │     (5 chars, trailing %)
+    [/%\xDF%\xDF\xDF\xDF\xDF/g, '\u2514'],
+    [/%\xDF%\xDF\xDF\xDF/g, '\u2502'],
+
+    // ---- UTF-8 encoded mojibake (0xC3 0x9F).
+    [/%\xC3\x9F%\xC3\x9F%\xC3\x9F\xC3\x9F/g, '\u2514'],
+    [/%\xC3\x9F%\xC3\x9F%\xC3\x9F/g, '\u251C'],
+    [/%\xC3\x9F%\xC3\x9F%/g, '\u2502'],
+    [/%\xC3\x9F%\xC3\x9F\xC3\x9F/g, '\u2514'],
+    [/%\xC3\x9F%\xC3\x9F/g, '\u2502'],
+
+    // ---- Leftovers: any % left next to a repaired glyph is separator noise.
+    [/\xDF/g, '\u2502'],
+    [/%%+/g, ' '],
+    [/%(?=\s*$)/g, ''],
+    [/(?<=\s)%/g, ' '],
+];
+
+/** Repair mojibake glyphs and normalise unicode quotes/dashes. */
+const repairGlyphs = (line: string): string => {
+    let out = line;
+    for (const [pattern, replacement] of GLYPH_REPAIRS) {
+        out = out.replace(pattern, replacement);
+    }
+    return out
+        .replace(/\u2018|\u2019/g, "'")
+        .replace(/\u201C|\u201D/g, '"')
+        .replace(/\u2013|\u2014/g, '-')
+        .replace(/\u2026/g, '...')
+        .replace(/\u00A0/g, ' ');
+};
+
+/** Lines that look like source code / directory trees. */
+const isCodeLine = (line: string): boolean => {
+    if (!line.trim()) return false;
+    // Box-drawing tree characters are a strong signal.
+    if (/[\u2502\u251C\u2514\u250C\u2500\u252C\u2534\u253C]/.test(line)) return true;
+    // A markdown fence, even glued to nearby text after PDF extraction.
+    if (line.includes('```')) return true;
+    // Two or more leading spaces = an indented listing / continuation.
+    if (/^[ \t]{2,}\S/.test(line)) return true;
+    // File paths, imports, or command lines.
+    if (/^\s*[\w./-]+\.(tsx?|jsx?|json|md|css|html|svg|pdf|py|sh)\b/.test(line)) return true;
+    if (/^\s*(import|export|const|let|var|function|class|from|require|<\/?[a-z])/.test(line)) return true;
+    return false;
+};
+
+/** Drop markdown markers that survived PDF extraction. */
+const stripInlineMarkers = (line: string): string =>
+    line
+        .replace(/`([^`]*)`/g, '$1')
+        .replace(/\*\*\*([^*]+)\*\*\*/g, '$1')
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/(^|[^\w])__([^_]+)__/g, '$1$2')
+        .replace(/~~([^~]+)~~/g, '$1')
+        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+        .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+        .replace(/\*/g, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+const classifyExtracted = (text: string): ExtractedBlock[] => {
+    // Repair mojibake glyph ids *before* classification so that a damaged
+    // directory tree is still recognised as code.
+    const lines = text
         .replace(/\r\n?/g, '\n')
-        .split(/\n{2,}/)
-        .map((block) => block.split('\n').map((l) => l.trim()).filter(Boolean).join('\n'))
+        .split('\n')
+        .map((l) => repairGlyphs(l));
+    const blocks: ExtractedBlock[] = [];
+    let i = 0;
+
+    while (i < lines.length) {
+        const line = lines[i];
+        const trimmed = line.trim();
+
+        if (!trimmed) {
+            i++;
+            continue;
+        }
+
+        // ---- horizontal rule ----
+        if (/^[-=\u2014\u2013_]{3,}$/.test(trimmed) && !/[A-Za-z]/.test(trimmed)) {
+            blocks.push({ kind: 'hr' });
+            i++;
+            continue;
+        }
+
+        // ---- code block (consume consecutive code lines) ----
+        if (isCodeLine(line)) {
+            const code: string[] = [];
+            while (i < lines.length && (isCodeLine(lines[i]) || !lines[i].trim())) {
+                code.push(lines[i].replace(/\s+$/, ''));
+                i++;
+            }
+            // Drop trailing blank lines captured from the lookahead.
+            while (code.length && !code[code.length - 1].trim()) code.pop();
+            if (code.length) blocks.push({ kind: 'code', lines: code });
+            continue;
+        }
+
+        // ---- heading ----
+        const heading = trimmed.match(/^(#{1,6})\s+(.*)$/);
+        if (heading) {
+            blocks.push({
+                kind: 'heading',
+                level: heading[1].length,
+                text: stripInlineMarkers(heading[2]),
+            });
+            i++;
+            continue;
+        }
+
+        // ---- quote ----
+        if (/^[>»]\s?/.test(trimmed)) {
+            const quote: string[] = [];
+            while (i < lines.length && /^[>»]\s?/.test(lines[i].trim()) && !isCodeLine(lines[i])) {
+                quote.push(lines[i].trim().replace(/^[>»]\s?/, ''));
+                i++;
+            }
+            blocks.push({ kind: 'quote', lines: quote });
+            continue;
+        }
+
+        // ---- list ----
+        const bullet = trimmed.match(/^[-*+•]\s+(.*)$/);
+        const numbered = trimmed.match(/^(\d+)[.)]\s+(.*)$/);
+        if (bullet || numbered) {
+            const ordered = !!numbered;
+            const items: string[] = [];
+            while (i < lines.length) {
+                const t = lines[i].trim();
+                if (!t) break;
+                const b = t.match(/^[-*+•]\s+(.*)$/);
+                const n = t.match(/^\d+[.)]\s+(.*)$/);
+                if (ordered && n) items.push(stripInlineMarkers(n[1]));
+                else if (!ordered && b) items.push(stripInlineMarkers(b[1]));
+                else break;
+                i++;
+            }
+            if (items.length) blocks.push({ kind: 'list', ordered, items });
+            continue;
+        }
+
+        // ---- paragraph (until a blank line or a structural line) ----
+        const para: string[] = [];
+        while (i < lines.length) {
+            const t = lines[i].trim();
+            if (!t) break;
+            if (isCodeLine(lines[i])) break;
+            if (/^(#{1,6})\s+/.test(t)) break;
+            if (/^[-*+•]\s+/.test(t) || /^\d+[.)]\s+/.test(t)) break;
+            if (/^[>»]\s?/.test(t)) break;
+            para.push(stripInlineMarkers(t));
+            i++;
+        }
+        if (para.length) blocks.push({ kind: 'paragraph', lines: para });
+    }
+
+    return blocks;
+};
+
+export const textToMarkdown = (text: string): string => {
+    return classifyExtracted(text)
+        .map((block) => {
+            switch (block.kind) {
+                case 'code': {
+                    const cleaned = block.lines.map((l) =>
+                        l.replace(/```+\s*\w*\s*/g, '').replace(/\s+$/, '')
+                    );
+                    return ['```', ...cleaned, '```'].join('\n');
+                }
+                case 'heading':
+                    return '#'.repeat(block.level) + ' ' + block.text;
+                case 'list':
+                    return block.items
+                        .map((item, idx) => (block.ordered ? `${idx + 1}. ${item}` : `- ${item}`))
+                        .join('\n');
+                case 'quote':
+                    return block.lines.map((l) => `> ${l}`).join('\n');
+                case 'hr':
+                    return '---';
+                case 'paragraph':
+                    return block.lines.join('\n');
+            }
+        })
         .filter(Boolean)
         .join('\n\n');
 };
 
 export const textToHtml = (text: string): string => {
-    return text
-        .replace(/\r\n?/g, '\n')
-        .split(/\n{2,}/)
-        .map((block) => block.split('\n').map((l) => escapeHtml(l.trim())).filter(Boolean).join('<br>'))
+    return classifyExtracted(text)
+        .map((block) => {
+            switch (block.kind) {
+                case 'code': {
+                    // Drop the ``` fences: they are markup, not content, and PDF
+                    // extraction often glues them onto the neighbouring line.
+                    const lines = block.lines
+                        .map((l) => l.replace(/```+\s*\w*\s*/g, '').replace(/\s+$/, ''));
+                    // One <div> per line: Word ignores bare newlines inside <pre>,
+                    // but it always honours block elements.
+                    const body = lines
+                        .map((l) => `<div>${escapeHtml(l) || '&nbsp;'}</div>`)
+                        .join('');
+                    return `<pre>${body}</pre>`;
+                }
+                case 'heading': {
+                    const level = Math.min(block.level, 6);
+                    return `<h${level}>${escapeHtml(block.text)}</h${level}>`;
+                }
+                case 'list': {
+                    const tag = block.ordered ? 'ol' : 'ul';
+                    const items = block.items
+                        .map((item) => `<li>${escapeHtml(item)}</li>`)
+                        .join('');
+                    return `<${tag}>${items}</${tag}>`;
+                }
+                case 'quote':
+                    return `<blockquote>${block.lines
+                        .map((l) => `<p>${escapeHtml(l)}</p>`)
+                        .join('')}</blockquote>`;
+                case 'hr':
+                    return '<hr/>';
+                case 'paragraph':
+                    return block.lines
+                        .map((l) => `<p>${escapeHtml(l)}</p>`)
+                        .join('');
+            }
+        })
         .filter(Boolean)
-        .map((p) => `<p>${p}</p>`)
         .join('\n');
 };

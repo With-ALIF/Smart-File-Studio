@@ -4,6 +4,7 @@ import { jsPDF } from 'jspdf';
 import { Download, FileText, FileCode } from 'lucide-react';
 import { useToast } from '../../../components/Toast';
 import type { MdBlock } from '../../../lib/markdown';
+import { NOTO_BENGALI_TTF } from '../../../lib/fonts/notoBengali';
 
 const CHAR_REPLACEMENTS: Record<string, string> = {
     '\u00A0': ' ', '\u2007': ' ', '\u2009': ' ', '\u200A': ' ', '\u202F': ' ', '\u200B': '',
@@ -22,21 +23,70 @@ const CHAR_REPLACEMENTS: Record<string, string> = {
     '\u00AD': '',
 };
 
-const isSafeChar = (code: number): boolean => {
+// jsPDF's built-in fonts are WinAnsi-only, which drops every Bengali glyph.
+// The bundled Noto Sans Bengali TTF is embedded instead when such text is
+// present, so it can carry the full Unicode range.
+const BENGALI_FONT_NAME = 'NotoBengali';
+const BENGALI_FONT_FILE = 'NotoSansBengali-Regular.ttf';
+
+let bengaliFontRegistered = false;
+
+const registerBengaliFont = (doc: jsPDF): boolean => {
+    if (bengaliFontRegistered) return true;
+    try {
+        const binary = atob(NOTO_BENGALI_TTF);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        doc.addFileToVFS(BENGALI_FONT_FILE, binary);
+        doc.addFont(BENGALI_FONT_FILE, BENGALI_FONT_NAME, 'normal');
+        doc.addFont(BENGALI_FONT_FILE, BENGALI_FONT_NAME, 'bold');
+        doc.addFont(BENGALI_FONT_FILE, BENGALI_FONT_NAME, 'italic');
+        doc.addFont(BENGALI_FONT_FILE, BENGALI_FONT_NAME, 'bolditalic');
+        bengaliFontRegistered = true;
+        return true;
+    } catch (e) {
+        console.error('Failed to register Bengali font:', e);
+        return false;
+    }
+};
+
+/** Bengali block plus the ASCII/Latin range the Noto font also covers. */
+const isBengaliChar = (code: number): boolean =>
+    (code >= 0x0980 && code <= 0x09FF) ||  // Bengali
+    (code >= 0x200C && code <= 0x200D) ||  // ZWNJ / ZWJ
+    code === 0x25CC;                          // dotted circle used by renderers
+
+const isLatinSafe = (code: number): boolean => {
     if (code === 9 || code === 10) return true;
     if (code >= 0x80 && code <= 0x9F) return false;
-    return code <= 0xFF;
+    return code <= 0x24F;
 };
+
+const hasBengali = (input: string): boolean => {
+    for (const ch of input) {
+        const code = ch.codePointAt(0) ?? 0;
+        if (code >= 0x0980 && code <= 0x09FF) return true;
+    }
+    return false;
+};
+
+/** Set once per document so sanitizeText() knows whether Noto is embedded. */
+let bengaliActive = false;
 
 const sanitizeText = (input: string): string => {
     let out = '';
     for (const ch of input) {
+        const code = ch.codePointAt(0) ?? 0;
         const mapped = CHAR_REPLACEMENTS[ch];
         if (mapped !== undefined) {
             out += mapped;
             continue;
         }
-        if (isSafeChar(ch.codePointAt(0) ?? 0)) out += ch;
+        if (bengaliActive && isBengaliChar(code)) {
+            out += ch;
+            continue;
+        }
+        if (isLatinSafe(code)) out += ch;
     }
     return out.replace(/[ \t]{2,}/g, ' ').trim();
 };
@@ -113,13 +163,29 @@ export const buildPdfBytes = (blocks: MdBlock[], title: string): jsPDF => {
     const contentW = pageW - margin * 2;
     let y = margin;
 
+    // Embed the Bengali-capable font up front so any Bengali run renders.
+    const bengaliReady =
+        hasBengali(title) || blocks.some((b) => JSON.stringify(b).match(/[\u0980-\u09FF]/));
+    const bengaliEnabled = bengaliReady ? registerBengaliFont(doc) : false;
+    bengaliActive = bengaliEnabled;
+
+    const pickFont = (font: FontKey): [string, string] => {
+        if (!bengaliEnabled) return FONTS[font];
+        // Monospace slots keep Courier for code; prose switches to Noto,
+        // whose Latin glyphs also carry the Bengali characters.
+        if (font === 'code' || font === 'codebold') {
+            return ['courier', font === 'codebold' ? 'bold' : 'normal'];
+        }
+        return [BENGALI_FONT_NAME, FONTS[font][1]];
+    };
+
     const newPage = () => {
         doc.addPage();
         y = margin;
     };
 
     const applyFont = (run: Run, size: number) => {
-        const [family, style] = FONTS[run.font];
+        const [family, style] = pickFont(run.font);
         doc.setFont(family, style);
         doc.setFontSize(size);
         doc.setTextColor(...(run.color ?? BASE_COLOR));
@@ -196,22 +262,30 @@ export const buildPdfBytes = (blocks: MdBlock[], title: string): jsPDF => {
 
     for (const block of blocks) {
         switch (block.type) {
-            case 'heading': {
+case 'heading': {
                 const size = [24, 19, 16, 14, 12, 11][Math.min(block.level, 6) - 1];
                 const lineHeight = size * 1.35;
                 const lines = layout(parseInline(block.text, 'bold'), size, contentW);
-                const needed = lines.length * lineHeight + 14;
 
-                if (y + needed > pageH - margin) newPage();
+                // Space above the heading so the rule never touches the
+                // previous paragraph (Bengali glyphs sit very high).
+                y += block.level === 1 ? 6 : 16;
+
+                const needed = lines.length * lineHeight + 14;
+                if (y + needed > pageH - margin) {
+                    newPage();
+                }
 
                 if (block.level <= 2) {
                     doc.setDrawColor(12, 102, 194);
                     doc.setLineWidth(block.level === 1 ? 2 : 1);
-                    doc.line(margin, y - size * 0.95, pageW - margin, y - size * 0.95);
+                    const headText = lines[0]?.find((w) => w.run.text.trim().length > 0)?.run.text ?? '';
+                    const asc = bengaliEnabled && hasBengali(headText) ? 1.15 : 0.95;
+                    doc.line(margin, y - size * asc, pageW - margin, y - size * asc);
                 }
-                y += size * 0.35;
+                y += bengaliEnabled ? size * 0.5 : size * 0.35;
                 drawLines(lines, size, margin, lineHeight);
-                y += block.level === 1 ? 10 : 6;
+                y += block.level === 1 ? (bengaliEnabled ? 16 : 10) : (bengaliEnabled ? 12 : 6);
                 break;
             }
 
@@ -265,7 +339,7 @@ export const buildPdfBytes = (blocks: MdBlock[], title: string): jsPDF => {
             case 'code': {
                 const size = 9.5;
                 const lineHeight = 13;
-                const rawLines = block.text.split('\n').map((l) => sanitizeText(l)).filter((l, i, arr) => l !== '' || i < arr.length - 1);
+const rawLines = block.text.split('\n').map((l) => sanitizeText(l)).filter((l, i, arr) => l !== '' || i < arr.length - 1);
                 const boxPad = 10;
                 const boxHeight = rawLines.length * lineHeight + boxPad * 2;
 
@@ -277,9 +351,11 @@ export const buildPdfBytes = (blocks: MdBlock[], title: string): jsPDF => {
                 doc.setLineWidth(2);
                 doc.line(margin, y - size, margin, y - size + boxHeight);
 
+                // Courier has no Bengali glyphs, so fall back to Noto there.
+                const codeFont = bengaliEnabled ? BENGALI_FONT_NAME : 'courier';
                 let codeY = y + boxPad;
                 rawLines.forEach((line) => {
-                    doc.setFont('courier', 'normal');
+                    doc.setFont(codeFont, 'normal');
                     doc.setFontSize(size);
                     doc.setTextColor(...BASE_COLOR);
                     doc.text(line || ' ', margin + boxPad + 2, codeY);
@@ -301,8 +377,8 @@ export const buildPdfBytes = (blocks: MdBlock[], title: string): jsPDF => {
         }
     }
 
-    doc.setProperties({ title });
-    doc.setFont('helvetica', 'normal');
+doc.setProperties({ title });
+    doc.setFont(bengaliEnabled ? BENGALI_FONT_NAME : 'helvetica', 'normal');
     doc.setTextColor(...BASE_COLOR);
     return doc;
 };

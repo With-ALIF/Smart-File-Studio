@@ -46,19 +46,37 @@ export const pdfItemsToPageText = (items: unknown[]): string => {
     const out: string[] = [];
     let prevY: number | null = null;
     let prevHeight = 12;
-    for (const line of lines) {
+for (const line of lines) {
         const ordered = [...line.items].sort((a, b) => a.x - b.x);
         let text = '';
         let prevRight: number | null = null;
+
+        // A monospaced code listing keeps every column the same distance
+        // apart, so a generous threshold still splits columns correctly
+        // while proportional prose stays a single space.
+        const monoLike = ordered.length > 2 && ordered.every((it) => it.str.length > 0 && it.width / Math.max(it.str.length, 1) > 0.5);
+        const gapFactor = monoLike ? 0.9 : 0.22;
+
         for (const item of ordered) {
-            if (prevRight !== null && item.x - prevRight > Math.max(1, item.height * 0.22)) {
-                text += ' ';
+            if (prevRight !== null && item.x - prevRight > Math.max(1, item.height * gapFactor)) {
+                // Two or more columns apart: keep the visual gap so the
+                // structure survives instead of collapsing into one blob.
+                const gap = item.x - prevRight;
+                if (gapFactor > 0.5 && gap > item.height * 1.6) {
+                    text += '  ';
+                } else {
+                    text += ' ';
+                }
             }
             text += item.str;
             prevRight = item.x + item.width;
         }
-        text = text.replace(/\s+/g, ' ').trim();
-        if (!text) continue;
+// Collapse only runs of spaces that come from PDF word-spacing.
+        // Leading indentation must survive or code listings lose their shape.
+        const leading = text.match(/^[ \t]*/)?.[0] ?? '';
+        const body = text.slice(leading.length).replace(/[^\S\n]{2,}/g, ' ');
+        text = (leading + body).replace(/[ \t]+$/, '');
+        if (!text.trim()) continue;
         if (prevY !== null && prevY - line.y > prevHeight * 1.6) out.push('');
         out.push(text);
         prevY = line.y;
@@ -80,6 +98,12 @@ export const extractPdfPagesText = async (file: File): Promise<string[]> => {
     return pages;
 };
 
+/** Join pages with a blank line so blocks never merge across page breaks. */
+export const joinPageText = (pages: string[]): string =>
+    pages
+        .map((p) => p.replace(/[ \t]+$/, ''))
+        .join('\n\n');
+
 interface PdfTextToolProps {
     hint: string;
     buttonLabel: string;
@@ -100,8 +124,8 @@ export const PdfTextTool: React.FC<PdfTextToolProps> = ({ hint, buttonLabel, onE
         if (!file || !window.pdfjsLib) return;
         setProcessing(true);
         try {
-            const pages = await extractPdfPagesText(file);
-            const text = pages.map(p => p.trim()).filter(Boolean).join('\n\n');
+const pages = await extractPdfPagesText(file);
+            const text = joinPageText(pages);
             const baseName = file.name.replace(/\.pdf$/i, '') || 'document';
             onExtract(text, baseName);
             showToast('Done');
