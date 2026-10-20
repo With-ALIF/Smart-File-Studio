@@ -39,3 +39,8 @@ bun.lock
 
 .env.*
 !.env.example
+
+# SVG files
+*.svg
+!favicon.svg
+!**/favicon.svg

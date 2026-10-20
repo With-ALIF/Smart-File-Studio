@@ -97,11 +97,11 @@ const Connect: React.FC = () => {
                 <p className="text-xs text-slate-400 font-medium uppercase">
                   {channel.label}
                 </p>
-                <p className="font-bold text-slate-800 truncate">
+                <p className="break-words font-bold leading-snug text-slate-800">
                   {channel.value}
                 </p>
               </div>
-              <ArrowUpRight className="w-4 h-4 text-slate-300 group-hover:text-[#0BA6DF] transition-colors" />
+              <ArrowUpRight className="w-4 h-4 shrink-0 text-slate-300 group-hover:text-[#0BA6DF] transition-colors" />
             </a>
           ))}
         </div>

@@ -10,20 +10,23 @@ const OG_IMAGE = '/og-image.png';
 export const metadata: Metadata = {
     metadataBase: new URL(SITE_URL),
     title: {
-        default: `${SITE_NAME} — Free Online Image, PDF & Markdown Tools`,
+        default: 'ALIF Tool (ALIF Tools) — Free Image, PDF & Markdown Tools',
         template: `%s | ${SITE_NAME}`,
     },
     description:
-        'ALIF Tool is a free online toolkit to resize, crop and convert images, merge, split and watermark PDFs, and convert Markdown to PDF or DOC. Fast, private and 100% free — no signup.',
+        'ALIF Tool (ALIF Tools, MNR Tool, Tools BD) — free online image, PDF and Markdown tools. Resize, convert, merge, split, watermark and more. No signup.',
     keywords: [
-        'alif tool', 'alif tools', 'tool alif', 'mnr tool', 'mnr tools', 'alif-tools',
+        'alif tool', 'alif tools', 'alif tool bd', 'alif tools bd', 'tool alif', 'alif-tools',
+        'mnr tool', 'mnr tools', 'mnr tool bd', 'mnr tools bd', 'mnr bd',
+        'tools bd', 'toolsbd', 'tools bd free', 'online tools bd', 'free tools bangladesh',
+        'bangla tools', 'bangla pdf tools', 'bangla image tools', 'বাংলা টুলস',
         'free online tools', 'image resizer', 'image cropper', 'image converter',
         'image to pdf', 'svg to png', 'pdf merge', 'pdf split', 'pdf watermark',
         'pdf to image', 'pdf to word', 'pdf to txt', 'pdf to markdown',
         'markdown to pdf', 'markdown to doc', 'markdown to txt',
-        'pdf tools', 'image tools', 'online file tools', 'bangla tools',
+        'pdf tools', 'image tools', 'online file tools',
     ],
-    authors: [{ name: 'ALIF' }],
+    authors: [{ name: 'ALIF', url: SITE_URL }],
     creator: 'ALIF',
     publisher: 'ALIF Tool',
     applicationName: SITE_NAME,
@@ -31,7 +34,7 @@ export const metadata: Metadata = {
     robots: {
         index: true,
         follow: true,
-        googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 },
+        googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1, 'max-video-preview': -1 },
     },
     alternates: {
         canonical: `${SITE_URL}/`,
@@ -51,18 +54,18 @@ export const metadata: Metadata = {
         siteName: SITE_NAME,
         locale: 'en_US',
         url: `${SITE_URL}/`,
-        title: `${SITE_NAME} — Free Online Image, PDF & Markdown Tools`,
+        title: 'ALIF Tool (ALIF Tools) — Free Image, PDF & Markdown Tools',
         description:
-            'Free online toolkit for images, PDFs and Markdown. Resize, crop, convert, merge, split and watermark — fast, private and free.',
+            'Free online toolkit for images, PDFs and Markdown — known as ALIF Tools, MNR Tool, MNR Tools and Tools BD. Resize, convert, merge, split and watermark in your browser.',
         images: [
             { url: OG_IMAGE, width: 1200, height: 630, alt: 'ALIF Tool — free online image, PDF and Markdown tools' },
         ],
     },
     twitter: {
         card: 'summary_large_image',
-        title: `${SITE_NAME} — Free Online Image, PDF & Markdown Tools`,
+        title: 'ALIF Tool (ALIF Tools) — Free Image, PDF & Markdown Tools',
         description:
-            'Free online toolkit for images, PDFs and Markdown. Resize, crop, convert, merge, split and watermark — fast, private and free.',
+            'Free online toolkit for images, PDFs and Markdown — known as ALIF Tools, MNR Tool, MNR Tools and Tools BD. Resize, convert, merge, split and watermark in your browser.',
         images: [OG_IMAGE],
     },
     other: {
@@ -86,8 +89,13 @@ const jsonLd = {
             '@id': `${SITE_URL}/#website`,
             url: `${SITE_URL}/`,
             name: SITE_NAME,
-            alternateName: ['Alif Tools', 'ALIF TOOLS', 'MNR Tool', 'MNR Tools'],
-            description: 'Free online toolkit for image, PDF and Markdown processing.',
+            alternateName: [
+                'Alif Tools', 'ALIF TOOLS', 'Alif Tool BD', 'ALIF Tool Bangladesh',
+                'MNR Tool', 'MNR Tools', 'MNR Tool BD', 'MNR Tools BD',
+                'Tools BD', 'ToolsBD', 'Tools BD Online',
+            ],
+            description:
+                'ALIF Tool (ALIF Tools, MNR Tool, MNR Tools, Tools BD) — free online toolkit for image, PDF and Markdown processing.',
             inLanguage: 'en',
             publisher: { '@id': `${SITE_URL}/#organization` },
         },
@@ -95,6 +103,7 @@ const jsonLd = {
             '@type': 'Organization',
             '@id': `${SITE_URL}/#organization`,
             name: SITE_NAME,
+            alternateName: ['ALIF Tools', 'MNR Tool', 'MNR Tools', 'Tools BD'],
             url: `${SITE_URL}/`,
             logo: {
                 '@type': 'ImageObject',
@@ -103,6 +112,7 @@ const jsonLd = {
                 height: 64,
             },
             image: `${SITE_URL}${OG_IMAGE}`,
+            areaServed: { '@type': 'Country', name: 'Bangladesh' },
             sameAs: [
                 'https://github.com/With-ALIF',
                 'https://www.facebook.com/withALIF',
@@ -112,6 +122,7 @@ const jsonLd = {
         {
             '@type': 'WebApplication',
             name: SITE_NAME,
+            alternateName: ['ALIF Tools', 'MNR Tool', 'MNR Tools', 'Tools BD'],
             url: `${SITE_URL}/`,
             applicationCategory: 'UtilitiesApplication',
             operatingSystem: 'Any',

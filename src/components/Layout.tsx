@@ -111,9 +111,6 @@ export const Footer = () => {
 
                 <div className="my-5 md:my-8 border-t border-slate-200" />
 
-                <div className="text-center text-xs text-slate-500 leading-relaxed">
-                    <p>© {new Date().getFullYear()} ALIF TOOL</p>
-                </div>
             </div>
         </footer>
     );

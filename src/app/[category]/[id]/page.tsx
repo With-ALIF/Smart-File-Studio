@@ -26,11 +26,19 @@ export async function generateMetadata({ params }: RouteProps): Promise<Metadata
 
     const expected = sectionFor(tool.category);
     const title = `${tool.title} — Free Online Tool`;
-    const description = `${tool.subtitle ?? tool.description} Free, fast and private — runs directly in your browser at ${SITE_URL}. No signup, no upload.`;
+    const description = `${tool.subtitle ?? tool.description} Free, fast and private — runs in your browser on ALIF Tool. No signup, no upload.`;
 
     return {
         title,
         description,
+        keywords: [
+            tool.title,
+            `${tool.title} online`,
+            `free ${tool.title.toLowerCase()}`,
+            `${tool.title} Bangladesh`,
+            'ALIF Tool', 'ALIF Tools', 'MNR Tool', 'MNR Tools', 'Tools BD',
+            'free online tools', 'browser tools',
+        ],
         alternates: { canonical: `/${expected}/${tool.id}` },
         openGraph: {
             title,
@@ -60,5 +68,29 @@ export default async function ToolPage({ params }: RouteProps) {
         redirect(`/${expected}/${tool.id}`);
     }
 
-    return <ToolRunner tool={tool} />;
+    const toolUrl = `${SITE_URL}/${expected}/${tool.id}`;
+    const appJsonLd = {
+        '@context': 'https://schema.org',
+        '@type': 'SoftwareApplication',
+        name: `${tool.title} — ALIF Tool`,
+        alternateName: ['ALIF Tool', 'ALIF Tools', 'MNR Tool', 'MNR Tools', 'Tools BD'],
+        url: toolUrl,
+        description: `${tool.subtitle ?? tool.description} Free online ${tool.title.toLowerCase()} by ALIF Tool.`,
+        applicationCategory: 'UtilitiesApplication',
+        operatingSystem: 'Any',
+        browserRequirements: 'Requires JavaScript',
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+        isPartOf: { '@type': 'WebSite', name: 'ALIF Tool', url: `${SITE_URL}/` },
+        publisher: { '@type': 'Organization', name: 'ALIF Tool', url: `${SITE_URL}/` },
+    };
+
+    return (
+        <>
+            <ToolRunner tool={tool} />
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(appJsonLd) }}
+            />
+        </>
+    );
 }

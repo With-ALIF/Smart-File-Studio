@@ -2,6 +2,7 @@ User-agent: *
 Allow: /
 
 # Search engines welcome
+Disallow: /api/
 Disallow: /dist/
 Disallow: /node_modules/
 

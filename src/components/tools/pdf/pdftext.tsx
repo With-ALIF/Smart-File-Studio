@@ -104,13 +104,86 @@ export const joinPageText = (pages: string[]): string =>
         .map((p) => p.replace(/[ \t]+$/, ''))
         .join('\n\n');
 
+/** A page with less real text than this is treated as a scan/picture page. */
+const MIN_PAGE_TEXT = 25;
+
+/**
+ * A PDF whose Bengali font has no Unicode map (very common with documents
+ * made in Bijoy/SutonnyMJ) comes back as raw glyph ids - e.g. "¬ ¾ ‚ ² ¾"
+ * instead of "বাংলা". Real Bengali, Latin, Arabic, Devanagari and other
+ * scripts always contain letters, so a page that is mostly Latin-1 symbols
+ * is unreadable and has to be taken from the rendered page instead.
+ */
+export const isUnreadablePageText = (text: string): boolean => {
+    const compact = text.replace(/\s+/g, '');
+    if (!compact) return true;
+    if (/[\u0980-\u09FF]/.test(compact)) return false;
+    if (/[A-Za-z]/.test(compact)) return false;
+    const symbols = (compact.match(/[\u00A0-\u02FF\u2010-\u203A\uE000-\uF8FF\uFFFD]/g) || []).length;
+    return symbols / compact.length > 0.2;
+};
+
+export const needsPageImage = (text: string): boolean =>
+    text.replace(/\s+/g, '').length < MIN_PAGE_TEXT || isUnreadablePageText(text);
+
+export interface PdfDocPage {
+    text: string;
+    /** JPEG data URL of the rendered page, only set when the text is unusable. */
+    image: string | null;
+    /** Page size in points (scale 1) so the doc can keep the aspect ratio. */
+    width: number;
+    height: number;
+}
+
+const renderPageImage = async (page: any): Promise<string | null> => {
+    try {
+        const viewport = page.getViewport({ scale: 2 });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.ceil(viewport.width));
+        canvas.height = Math.max(1, Math.ceil(viewport.height));
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return null;
+        // JPEG has no alpha channel: without this the page background is black.
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        return canvas.toDataURL('image/jpeg', 0.85);
+    } catch (err) {
+        console.error('PDF page render failed', err);
+        return null;
+    }
+};
+
+/**
+ * Page-by-page extraction for the DOC export. Pages whose text layer is
+ * missing (scans, rasterised Bengali) or garbled (font without ToUnicode)
+ * are rendered to an image so the document is never blank.
+ */
+export const extractPdfPagesForDoc = async (file: File): Promise<PdfDocPage[]> => {
+    const buffer = await readFileAsArrayBuffer(file);
+    const pdf = await window.pdfjsLib.getDocument({ data: buffer }).promise;
+    const pages: PdfDocPage[] = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const text = pdfItemsToPageText(content.items);
+        const size = page.getViewport({ scale: 1 });
+        const image = needsPageImage(text) ? await renderPageImage(page) : null;
+        pages.push({ text, image, width: size.width, height: size.height });
+        page.cleanup();
+    }
+    return pages;
+};
+
 interface PdfTextToolProps {
     hint: string;
     buttonLabel: string;
-    onExtract: (text: string, baseName: string) => void;
+    onExtract?: (text: string, baseName: string) => void;
+    /** Used by exports that need the original pages (PDF -> Docs). */
+    onExtractFile?: (file: File, baseName: string) => Promise<void> | void;
 }
 
-export const PdfTextTool: React.FC<PdfTextToolProps> = ({ hint, buttonLabel, onExtract }) => {
+export const PdfTextTool: React.FC<PdfTextToolProps> = ({ hint, buttonLabel, onExtract, onExtractFile }) => {
     const { showToast } = useToast();
     const [file, setFile] = useState<File | null>(null);
     const [processing, setProcessing] = useState(false);
@@ -124,10 +197,13 @@ export const PdfTextTool: React.FC<PdfTextToolProps> = ({ hint, buttonLabel, onE
         if (!file || !window.pdfjsLib) return;
         setProcessing(true);
         try {
-const pages = await extractPdfPagesText(file);
-            const text = joinPageText(pages);
             const baseName = file.name.replace(/\.pdf$/i, '') || 'document';
-            onExtract(text, baseName);
+            if (onExtractFile) {
+                await onExtractFile(file, baseName);
+            } else if (onExtract) {
+                const pages = await extractPdfPagesText(file);
+                onExtract(joinPageText(pages), baseName);
+            }
             showToast('Done');
         } catch (e) {
             console.error(e);

@@ -1,7 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { BackLink, CardShell, Footer, ToolHeader } from './Layout';
-import { sectionFor } from '../lib/tools';
+import { TOOLS, sectionFor } from '../lib/tools';
 import type { ToolDef } from '../types';
 
 import { ImageResizer } from './tools/img/imgresizer';
@@ -47,13 +48,58 @@ const renderTool = (id: string) => {
     }
 };
 
-export const ToolRunner = ({ tool }: { tool: ToolDef }) => (
-    <>
-        <CardShell>
-            <BackLink />
-            <ToolHeader title={tool.title} subtitle={tool.subtitle ?? tool.description} />
-            {renderTool(tool.id)}
-        </CardShell>
-        <Footer />
-    </>
-);
+const CATEGORY_NAME: Record<string, string> = {
+    PDF: 'PDF',
+    IMAGE: 'image',
+    MARKDOWN: 'Markdown',
+};
+
+export const ToolRunner = ({ tool }: { tool: ToolDef }) => {
+    const related = TOOLS.filter(t => t.category === tool.category && t.id !== tool.id);
+
+    return (
+        <>
+            <CardShell>
+                <BackLink />
+                <ToolHeader title={tool.title} subtitle={tool.subtitle ?? tool.description} />
+                {renderTool(tool.id)}
+            </CardShell>
+
+            <section className="max-w-3xl mx-auto px-4 pb-12 space-y-3 text-sm text-slate-600 leading-relaxed">
+                <h2 className="text-xl md:text-2xl font-bold text-slate-800">
+                    About the {tool.title} tool
+                </h2>
+                <p>
+                    {tool.subtitle ?? tool.description} It is part of{' '}
+                    <Link href="/" className="text-sky-700 hover:underline">ALIF Tool</Link>{' '}
+                    (also known as ALIF Tools, MNR Tool, MNR Tools and Tools BD) — a free
+                    online toolbox for images, PDFs and Markdown files.
+                </p>
+                <p>
+                    Open the {tool.title.toLowerCase()} tool, choose or paste your file, adjust the
+                    options, then download the result. Everything runs inside your browser, so your
+                    files stay on your device. There is no signup, no watermark and no cost, and it
+                    works on Android, iPhone, Windows and Mac in Chrome, Edge, Firefox or Safari.
+                </p>
+                {related.length > 0 && (
+                    <p>
+                        More {CATEGORY_NAME[tool.category] ?? ''} tools:{' '}
+                        {related.map((item, index) => (
+                            <span key={item.id}>
+                                {index > 0 && ' · '}
+                                <Link
+                                    href={`/${sectionFor(item.category)}/${item.id}`}
+                                    className="text-sky-700 hover:underline"
+                                >
+                                    {item.title}
+                                </Link>
+                            </span>
+                        ))}
+                    </p>
+                )}
+            </section>
+
+            <Footer />
+        </>
+    );
+};

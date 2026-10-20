@@ -90,18 +90,20 @@ export const markdownToBlocks = (md: string): MdBlock[] => {
 
         const fence = line.match(FENCE_RE);
         if (fence) {
-            const marker = fence[1][0].repeat(3);
+            const marker = fence[1][0];
             const openIndent = (line.match(/^ */) ?? [''])[0].length;
             const code: string[] = [];
             i++;
             while (i < lines.length) {
                 const close = lines[i].match(FENCE_CLOSE_RE);
-                if (close && close[1][0] === marker && (lines[i].match(/^ */) ?? [''])[0].length <= openIndent + 3) {
+                const closeIndent = (lines[i].match(/^ */) ?? [''])[0].length;
+                if (close && close[1][0] === marker && closeIndent <= openIndent + 3) {
                     i++;
                     break;
                 }
-                const strip = close ? lines[i].slice(marker.length) : lines[i];
-                const text = strip.slice(0, openIndent).trim() === '' ? strip.slice(openIndent) : strip;
+                const text = lines[i].slice(0, openIndent).trim() === ''
+                    ? lines[i].slice(openIndent)
+                    : lines[i];
                 code.push(text.replace(/\s+$/, ''));
                 i++;
             }

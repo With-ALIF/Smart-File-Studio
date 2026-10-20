@@ -136,6 +136,14 @@ const About: React.FC = () => {
           </p>
 
           <p>
+            ALIF Tools is also known as <strong>ALIF Tool</strong>,{" "}
+            <strong>MNR Tool</strong>, <strong>MNR Tools</strong> and{" "}
+            <strong>Tools BD</strong>. If you found us by searching for any of
+            those names, you are in the right place — every tool lives at{" "}
+            <strong>alif-tools.mnr.bd</strong> and is completely free to use.
+          </p>
+
+          <p>
             From resizing and converting images to merging, splitting and
             extracting text from PDFs, and turning Markdown into polished
             documents — every tool runs instantly and reliably through a

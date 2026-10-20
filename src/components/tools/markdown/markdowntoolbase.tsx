@@ -4,7 +4,12 @@ import { jsPDF } from 'jspdf';
 import { Check, Copy, Download, FileCode, FileText, Sparkles, Upload, X } from 'lucide-react';
 import { useToast } from '../../../components/Toast';
 import type { MdBlock } from '../../../lib/markdown';
-import { NOTO_BENGALI_TTF } from '../../../lib/fonts/notoBengali';
+import {
+    clearBengaliCache,
+    ensureBengaliFont,
+    measureBengaliWidthPt,
+    renderBengali,
+} from '../../../lib/fonts/bengaliCanvas';
 
 const CHAR_REPLACEMENTS: Record<string, string> = {
     '\u00A0': ' ', '\u2007': ' ', '\u2009': ' ', '\u200A': ' ', '\u202F': ' ', '\u200B': '',
@@ -19,38 +24,17 @@ const CHAR_REPLACEMENTS: Record<string, string> = {
     '\u2713': 'v', '\u2714': 'v',
     '\u26A0': '!', '\u2757': '!', '\u24D8': '!',
     '\uFE0E': '', '\uFE0F': '',
-    '\u200D': '',
     '\u00AD': '',
 };
 
-// jsPDF's built-in fonts are WinAnsi-only, which drops every Bengali glyph.
-// The bundled Noto Sans Bengali TTF is embedded instead when such text is
-// present, so it can carry the full Unicode range.
-const BENGALI_FONT_NAME = 'NotoBengali';
-const BENGALI_FONT_FILE = 'NotoSansBengali-Regular.ttf';
+// jsPDF's built-in fonts are WinAnsi-only and, more importantly, jsPDF never
+// runs OpenType shaping (GSUB). Bengali needs that shaping to form conjuncts
+// (যুক্তাক্ষর like ক্ষ) and to reposition vowel signs, so we can't just embed a
+// Bengali TTF — it would render as disjoint glyphs. Instead, Bengali runs are
+// rasterised by the browser's text engine (see lib/fonts/bengaliCanvas) and
+// placed as high-res PNGs. Latin text keeps the crisp vector path.
 
-let bengaliFontRegistered = false;
-
-const registerBengaliFont = (doc: jsPDF): boolean => {
-    if (bengaliFontRegistered) return true;
-    try {
-        const binary = atob(NOTO_BENGALI_TTF);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        doc.addFileToVFS(BENGALI_FONT_FILE, binary);
-        doc.addFont(BENGALI_FONT_FILE, BENGALI_FONT_NAME, 'normal');
-        doc.addFont(BENGALI_FONT_FILE, BENGALI_FONT_NAME, 'bold');
-        doc.addFont(BENGALI_FONT_FILE, BENGALI_FONT_NAME, 'italic');
-        doc.addFont(BENGALI_FONT_FILE, BENGALI_FONT_NAME, 'bolditalic');
-        bengaliFontRegistered = true;
-        return true;
-    } catch (e) {
-        console.error('Failed to register Bengali font:', e);
-        return false;
-    }
-};
-
-/** Bengali block plus the ASCII/Latin range the Noto font also covers. */
+/** Bengali block plus ZWJ/ZWNJ and the dotted circle used by renderers. */
 const isBengaliChar = (code: number): boolean =>
     (code >= 0x0980 && code <= 0x09FF) ||  // Bengali
     (code >= 0x200C && code <= 0x200D) ||  // ZWNJ / ZWJ
@@ -173,7 +157,7 @@ const parseInline = (input: string, base: FontKey = 'normal'): Run[] => {
     return runs.length ? runs : [{ text: '', font: base }];
 };
 
-export const buildPdfBytes = (blocks: MdBlock[], title: string): jsPDF => {
+export const buildPdfBytes = async (blocks: MdBlock[], title: string): Promise<jsPDF> => {
     const doc = new jsPDF({ unit: 'pt', format: 'a4' });
     const pageW = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
@@ -181,20 +165,76 @@ export const buildPdfBytes = (blocks: MdBlock[], title: string): jsPDF => {
     const contentW = pageW - margin * 2;
     let y = margin;
 
-    // Embed the Bengali-capable font up front so any Bengali run renders.
-    const bengaliReady =
+    // Detect Bengali up front so sanitizeText() keeps those codepoints and we
+    // know to load the shaping font. jsPDF itself never runs OpenType shaping,
+    // so Bengali is drawn as rasterised images via lib/fonts/bengaliCanvas.
+    const docHasBengali =
         hasBengali(title) || blocks.some((b) => JSON.stringify(b).match(/[\u0980-\u09FF]/));
-    const bengaliEnabled = bengaliReady ? registerBengaliFont(doc) : false;
-    bengaliActive = bengaliEnabled;
+    bengaliActive = docHasBengali;
+    // Load the web font so canvas shaping is ready before we draw anything.
+    if (docHasBengali) {
+        clearBengaliCache();
+        await ensureBengaliFont();
+    }
 
-    const pickFont = (font: FontKey): [string, string] => {
-        if (!bengaliEnabled) return FONTS[font];
-        // Monospace slots keep Courier for code; prose switches to Noto,
-        // whose Latin glyphs also carry the Bengali characters.
-        if (font === 'code' || font === 'codebold') {
-            return ['courier', font === 'codebold' ? 'bold' : 'normal'];
+    const isBoldFont = (font: FontKey) =>
+        font === 'bold' || font === 'bolditalic' || font === 'codebold';
+    const isItalicFont = (font: FontKey) => font === 'italic' || font === 'bolditalic';
+
+    /** Accurate shaped width for Bengali, jsPDF metrics for everything else. */
+    const wordWidth = (text: string, run: Run, size: number): number => {
+        if (docHasBengali && hasBengali(text)) {
+            return measureBengaliWidthPt(text, size, isBoldFont(run.font), isItalicFont(run.font));
         }
-        return [BENGALI_FONT_NAME, FONTS[font][1]];
+        applyFont(run, size);
+        return doc.getTextWidth(text);
+    };
+
+    /** Draw one word; rasterises Bengali, uses vector text for Latin. */
+    const drawWord = (
+        text: string,
+        run: Run,
+        size: number,
+        x: number,
+        baseline: number,
+        width: number,
+        strikeColor?: [number, number, number],
+    ) => {
+        if (docHasBengali && hasBengali(text)) {
+            const img = renderBengali(
+                text,
+                size,
+                isBoldFont(run.font),
+                isItalicFont(run.font),
+                run.color ?? BASE_COLOR,
+            );
+            if (img) {
+                doc.addImage(
+                    img.dataUrl,
+                    'PNG',
+                    x + img.xPt,
+                    baseline + img.yPt,
+                    img.wPt,
+                    img.hPt,
+                    img.alias,
+                    'FAST',
+                );
+                if (run.strike) {
+                    doc.setDrawColor(...(strikeColor ?? [150, 150, 150]));
+                    doc.setLineWidth(0.5);
+                    doc.line(x, baseline - size * 0.3, x + width, baseline - size * 0.3);
+                }
+                return;
+            }
+            // If rasterising failed, fall through to plain vector text.
+        }
+        applyFont(run, size);
+        doc.text(text, x, baseline);
+        if (run.strike) {
+            doc.setDrawColor(...(strikeColor ?? [150, 150, 150]));
+            doc.setLineWidth(0.5);
+            doc.line(x, baseline - size * 0.3, x + width, baseline - size * 0.3);
+        }
     };
 
     const newPage = () => {
@@ -203,36 +243,45 @@ export const buildPdfBytes = (blocks: MdBlock[], title: string): jsPDF => {
     };
 
     const applyFont = (run: Run, size: number) => {
-        const [family, style] = pickFont(run.font);
+        const [family, style] = FONTS[run.font];
         doc.setFont(family, style);
         doc.setFontSize(size);
         doc.setTextColor(...(run.color ?? BASE_COLOR));
     };
 
-    const layout = (runs: Run[], size: number, maxWidth: number) => {
-        type Word = { text: string; run: Run; width: number; spaceAfter: number };
-        const words: Word[] = [];
+    type LaidWord = { text: string; run: Run; width: number; spaceWidth: number };
+
+    /** Advance width of a single space for this run (shaped for Bengali). */
+    const spaceWidth = (run: Run, size: number): number => {
+        if (docHasBengali && hasBengali(run.text)) {
+            return measureBengaliWidthPt(' ', size, isBoldFont(run.font), isItalicFont(run.font));
+        }
+        applyFont(run, size);
+        return doc.getTextWidth(' ');
+    };
+
+    const layout = (runs: Run[], size: number, maxWidth: number): LaidWord[][] => {
+        const words: LaidWord[] = [];
 
         for (const run of runs) {
-            applyFont(run, size);
-            const spaceW = doc.getTextWidth(' ');
+            const gap = spaceWidth(run, size);
             const parts = run.text.split(/\s+/).filter(Boolean);
-            parts.forEach((part, i) => {
+            for (const part of parts) {
                 words.push({
                     text: part,
                     run,
-                    width: doc.getTextWidth(part),
-                    spaceAfter: i < parts.length - 1 ? spaceW : 0,
+                    width: wordWidth(part, run, size),
+                    spaceWidth: gap,
                 });
-            });
+            }
         }
 
-        const lines: Word[][] = [];
-        let line: Word[] = [];
+        const lines: LaidWord[][] = [];
+        let line: LaidWord[] = [];
         let width = 0;
 
         for (const word of words) {
-            const extra = line.length === 0 ? 0 : doc.getTextWidth(' ');
+            const extra = line.length === 0 ? 0 : line[line.length - 1].spaceWidth;
             const needed = word.width + extra;
             if (line.length > 0 && width + needed > maxWidth) {
                 lines.push(line);
@@ -250,32 +299,25 @@ export const buildPdfBytes = (blocks: MdBlock[], title: string): jsPDF => {
     };
 
     const drawLines = (
-        lines: { text: string; run: Run; width: number; spaceAfter: number }[][],
+        lines: LaidWord[][],
         size: number,
         x: number,
         lineHeight: number,
         strikeColor?: [number, number, number],
     ) => {
-        lines.forEach((words, lineIndex) => {
+        lines.forEach((words) => {
             let cursor = x;
             if (!words.length) {
                 y += lineHeight;
                 return;
             }
             words.forEach((word, i) => {
-                applyFont(word.run, size);
-                doc.text(word.text, cursor, y);
-                if (word.run.strike) {
-                    doc.setDrawColor(...(strikeColor ?? [150, 150, 150]));
-                    doc.setLineWidth(0.5);
-                    doc.line(cursor, y - size * 0.3, cursor + word.width, y - size * 0.3);
-                }
+                drawWord(word.text, word.run, size, cursor, y, word.width, strikeColor);
                 cursor += word.width;
-                if (i < words.length - 1) cursor += doc.getTextWidth(' ');
+                if (i < words.length - 1) cursor += word.spaceWidth;
             });
-            if (lineIndex < lines.length - 1) y += lineHeight;
+            y += lineHeight;
         });
-        y += lineHeight;
     };
 
     for (const block of blocks) {
@@ -298,18 +340,18 @@ case 'heading': {
                     doc.setDrawColor(12, 102, 194);
                     doc.setLineWidth(block.level === 1 ? 2 : 1);
                     const headText = lines[0]?.find((w) => w.run.text.trim().length > 0)?.run.text ?? '';
-                    const asc = bengaliEnabled && hasBengali(headText) ? 1.15 : 0.95;
+                    const asc = docHasBengali && hasBengali(headText) ? 1.15 : 0.95;
                     doc.line(margin, y - size * asc, pageW - margin, y - size * asc);
                 }
-                y += bengaliEnabled ? size * 0.5 : size * 0.35;
+                y += docHasBengali ? size * 0.5 : size * 0.35;
                 drawLines(lines, size, margin, lineHeight);
-                y += block.level === 1 ? (bengaliEnabled ? 16 : 10) : (bengaliEnabled ? 12 : 6);
+                y += block.level === 1 ? (docHasBengali ? 16 : 10) : (docHasBengali ? 12 : 6);
                 break;
             }
 
             case 'paragraph': {
                 const size = 11;
-                const lineHeight = 16;
+                const lineHeight = docHasBengali ? 18 : 16;
                 const lines = layout(parseInline(block.text), size, contentW);
                 if (y + lines.length * lineHeight > pageH - margin) newPage();
                 drawLines(lines, size, margin, lineHeight);
@@ -319,7 +361,7 @@ case 'heading': {
 
             case 'quote': {
                 const size = 11;
-                const lineHeight = 16;
+                const lineHeight = docHasBengali ? 18 : 16;
                 const lines = layout(parseInline(block.text, 'italic'), size, contentW - 18);
                 if (y + lines.length * lineHeight + 12 > pageH - margin) newPage();
 
@@ -337,7 +379,7 @@ case 'heading': {
 
             case 'list': {
                 const size = 11;
-                const lineHeight = 16;
+                const lineHeight = docHasBengali ? 18 : 16;
                 block.items.forEach((item, idx) => {
                     const marker = block.ordered ? `${idx + 1}.` : '\u2022';
                     const lines = layout(parseInline(item), size, contentW - 26);
@@ -356,7 +398,7 @@ case 'heading': {
 
             case 'table': {
                 const size = 9.5;
-                const lineHeight = 13;
+                const lineHeight = docHasBengali ? 15 : 13;
                 const pad = 5;
                 const columns = block.header.length;
                 const colW = contentW / columns;
@@ -386,10 +428,9 @@ case 'heading': {
                         lines.forEach((words) => {
                             let cursor = x + pad;
                             words.forEach((word, wordIndex) => {
-                                applyFont(word.run, size);
-                                doc.text(word.text, cursor, cellY);
+                                drawWord(word.text, word.run, size, cursor, cellY, word.width);
                                 cursor += word.width;
-                                if (wordIndex < words.length - 1) cursor += doc.getTextWidth(' ');
+                                if (wordIndex < words.length - 1) cursor += word.spaceWidth;
                             });
                             cellY += lineHeight;
                         });
@@ -407,22 +448,31 @@ case 'heading': {
 
             case 'code': {
                 const size = 9.5;
-                const lineHeight = 13;
+                const lineHeight = docHasBengali ? 15 : 13;
                 const boxPad = 10;
                 const maxTextWidth = contentW - boxPad * 2 - 2;
+
+                // Breathing room above the box (tables/quotes otherwise sit
+                // flush against it).
+                y += 6;
                 const rawLines = block.text
                     .split('\n')
                     .map((line) => sanitizeCodeLine(line.replace(/\t/g, '    ')));
 
+                const measureWidth = (text: string, lineHasBengali: boolean): number =>
+                    lineHasBengali ? measureBengaliWidthPt(text, size, false, false) : (() => {
+                        doc.setFont('courier', 'normal');
+                        doc.setFontSize(size);
+                        return doc.getTextWidth(text);
+                    })();
+
                 const wrapLine = (line: string, lineHasBengali: boolean): string[] => {
-                    doc.setFont(lineHasBengali && bengaliEnabled ? BENGALI_FONT_NAME : 'courier', 'normal');
-                    doc.setFontSize(size);
                     if (!line) return [''];
                     const lines: string[] = [];
                     let current = '';
                     for (const ch of line) {
                         const next = current + ch;
-                        if (current && doc.getTextWidth(next) > maxTextWidth) {
+                        if (current && measureWidth(next, lineHasBengali) > maxTextWidth) {
                             lines.push(current);
                             current = ch;
                         } else {
@@ -435,7 +485,7 @@ case 'heading': {
 
                 const wrapped: { text: string; bengali: boolean }[] = [];
                 for (const line of rawLines) {
-                    const bengali = bengaliEnabled && hasBengali(line);
+                    const bengali = docHasBengali && hasBengali(line);
                     for (const part of wrapLine(line, bengali)) {
                         wrapped.push({ text: part, bengali });
                     }
@@ -462,10 +512,16 @@ case 'heading': {
 
                     let codeY = y + boxPad;
                     for (const item of chunk) {
-                        doc.setFont(item.bengali ? BENGALI_FONT_NAME : 'courier', 'normal');
-                        doc.setFontSize(size);
-                        doc.setTextColor(...BASE_COLOR);
-                        doc.text(item.text || ' ', margin + boxPad + 2, codeY);
+                        const codeX = margin + boxPad + 2;
+                        const codeRun: Run = { text: item.text, font: 'code' };
+                        drawWord(
+                            item.text || ' ',
+                            codeRun,
+                            size,
+                            codeX,
+                            codeY,
+                            measureWidth(item.text, item.bengali),
+                        );
                         codeY += lineHeight;
                     }
 
@@ -487,8 +543,8 @@ case 'heading': {
         }
     }
 
-doc.setProperties({ title });
-    doc.setFont(bengaliEnabled ? BENGALI_FONT_NAME : 'helvetica', 'normal');
+    doc.setProperties({ title });
+    doc.setFont('helvetica', 'normal');
     doc.setTextColor(...BASE_COLOR);
     return doc;
 };

@@ -1,7 +1,7 @@
 {
-  "name": "ALIF Tool",
+  "name": "ALIF Tool — ALIF Tools, MNR Tool, Tools BD",
   "short_name": "ALIF Tool",
-  "description": "Free online toolkit for image, PDF and Markdown processing.",
+  "description": "Free online image, PDF and Markdown tools — ALIF Tool, also known as ALIF Tools, MNR Tool, MNR Tools and Tools BD.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
